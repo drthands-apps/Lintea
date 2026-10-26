@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trama — Espacio de escritura e investigación</title>
+<style>
+  :root {
+    --bg: #f4f2ed;
+    --panel: #fffefa;
+    --panel-2: #f8f7f2;
+    --ink: #282d2b;
+    --muted: #777d77;
+    --line: #e5e3db;
+    --accent: #476b5c;
+    --accent-soft: #e5eee8;
+    --gold: #c49b57;
+    --blue: #5c7fa5;
+    --rose: #b96f68;
+    --shadow: 0 8px 30px rgba(38, 44, 39, .05);
+    --radius: 13px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  button, input { font: inherit; }
+  button { cursor: default; }
+  .app { min-height: 100vh; display: grid; grid-template-columns: 236px minmax(440px, 1fr) 292px; grid-template-rows: 64px minmax(0, 1fr); }
+  .topbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 22px;
+    background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2;
+  }
+  .brand { display:flex; align-items:center; gap:10px; width: 192px; flex-shrink:0; font-weight:750; letter-spacing:-.04em; font-size:19px; }
+  .brandmark { width:29px; height:29px; border-radius:9px; display:grid; place-items:center; background:var(--accent); color:white; font-family:Georgia,serif; font-size:19px; font-weight:500; }
+  .project-switch { display:flex; align-items:center; gap:8px; padding:8px 11px; border:1px solid var(--line); border-radius:9px; min-width:190px; background:#fff; }
+  .project-dot { width:8px; height:8px; border-radius:50%; background:var(--gold); }
+  .search { display:flex; align-items:center; gap:8px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:9px 12px; max-width:420px; flex:1; margin:auto; }
+  .search kbd { margin-left:auto; border:1px solid #deddd6; border-radius:4px; padding:1px 5px; font-size:11px; background:white; }
+  .top-actions { display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .avatar { width:30px;height:30px;border-radius:50%;background:#e7d8c7;color:#695744;display:grid;place-items:center;font-weight:700;font-size:11px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 11px; color:var(--ink); white-space:nowrap; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:white; }
+  .sidebar { background:var(--panel); border-right:1px solid var(--line); padding:19px 13px; overflow:auto; }
+  .section-label { color:#92958e; text-transform:uppercase; letter-spacing:.09em; font-size:10px; font-weight:750; padding:0 10px; margin:15px 0 8px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; color:#5d635e; margin:2px 0; }
+  .nav-item.active { background:var(--accent-soft); color:#315644; font-weight:650; }
+  .ico { width:18px; text-align:center; color:#7d847d; font-size:15px; flex-shrink:0; }
+  .nav-item.active .ico { color:var(--accent); }
+  .count { margin-left:auto; color:#858b83; font-size:11px; }
+  .project-card { margin:22px 5px 0; padding:13px; background:#f7f5ef; border:1px solid var(--line); border-radius:11px; }
+  .project-card strong { display:block; font-size:12px; margin-bottom:5px; }
+  .project-card p { margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
+  .progress { height:4px; background:#e4e2d9; border-radius:8px; margin-top:12px; overflow:hidden; }
+  .progress span { display:block; width:64%; height:100%; background:var(--accent); border-radius:8px; }
+  .main { min-width:0; overflow:hidden; }
+  .workspace-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:22px 28px 14px; }
+  .crumb { color:var(--muted); font-size:12px; margin-bottom:5px; }
+  h1 { font-family:Georgia, "Times New Roman", serif; font-weight:500; font-size:27px; letter-spacing:-.035em; margin:0; }
+  .head-actions { display:flex; gap:8px; align-items:center; }
+  .tabs { display:flex; gap:5px; padding:0 28px 14px; border-bottom:1px solid var(--line); overflow:auto; }
+  .tab { color:var(--muted); padding:8px 11px; border-radius:8px; white-space:nowrap; }
+  .tab.active { color:var(--accent); background:var(--accent-soft); font-weight:650; }
+  .document-wrap { padding:22px 28px 36px; max-width:920px; margin:0 auto; }
+  .doc-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:7px; background:var(--panel); border:1px solid var(--line); border-radius:10px 10px 0 0; }
+  .tool { padding:5px 8px; color:#626860; border-radius:5px; font-size:12px; }
+  .tool.em { font-weight:750; }
+  .tool.sep { border-left:1px solid var(--line); margin-left:3px; padding-left:12px; }
+  .doc-page { background:var(--panel); border:1px solid var(--line); border-top:0; padding:34px clamp(24px, 6vw, 68px) 45px; box-shadow:var(--shadow); min-height:570px; }
+  .doc-meta { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:11px; margin-bottom:26px; }
+  .pill { padding:4px 8px; border-radius:20px; background:#f0eee7; color:#696e66; font-size:10px; font-weight:650; }
+  .pill.green { background:var(--accent-soft); color:#416750; }
+  .doc-page h2 { font-family:Georgia,serif; font-weight:500; font-size:30px; line-height:1.2; letter-spacing:-.03em; margin:0 0 10px; }
+  .subtitle { color:#898d85; font-family:Georgia,serif; font-style:italic; font-size:15px; margin-bottom:30px; }
+  .doc-page p { color:#414741; font-family:Georgia,"Times New Roman",serif; font-size:16px; line-height:1.9; margin:0 0 17px; }
+  .highlight { background:linear-gradient(transparent 57%, #e7eee7 57%); border-bottom:1px dashed #7c9b85; }
+  .highlight.gold { background:linear-gradient(transparent 57%, #f5ead2 57%); border-bottom:1px dashed #c6a15e; }
+  .inline-note { display:inline-block; font-family:ui-sans-serif,system-ui,sans-serif; font-size:10px; font-weight:700; vertical-align:super; color:#416750; margin-left:2px; }
+  .doc-footer { display:flex; align-items:center; justify-content:space-between; color:#92958e; font-size:11px; border-top:1px solid var(--line); padding-top:13px; margin-top:28px; }
+  .rightbar { border-left:1px solid var(--line); background:#faf9f5; padding:20px 16px; overflow:auto; }
+  .right-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+  .right-head h3 { font-size:13px; margin:0; }
+  .quiet { color:var(--muted); font-size:11px; }
+  .context-card { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:13px; margin-bottom:12px; }
+  .card-title { display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; margin-bottom:9px; }
+  .card-title .ico { width:20px; height:20px; border-radius:6px; background:#f2eee4; display:grid; place-items:center; font-size:12px; }
+  .entity { display:flex; align-items:flex-start; gap:9px; padding:9px 0; border-top:1px solid #f0eee7; }
+  .entity:first-of-type { border-top:0; }
+  .entity-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .entity strong { display:block; font-size:12px; font-weight:650; }
+  .entity small { display:block; color:var(--muted); font-size:10px; margin-top:2px; line-height:1.45; }
+  .entity .mini-tag { margin-left:auto; font-size:9px; color:#858980; background:#f4f2ed; border-radius:4px; padding:3px 5px; }
+  .source-row { display:flex; gap:9px; align-items:flex-start; padding:9px 0; border-top:1px solid #f0eee7; }
+  .source-icon { width:27px;height:31px;border-radius:5px;background:#f2e7d6;color:#99713d;display:grid;place-items:center;flex-shrink:0; }
+  .source-row strong { display:block; font-size:11px; line-height:1.4; }
+  .source-row small { display:block; color:var(--muted); font-size:10px; margin-top:3px; }
+  .ai-card { background:#eef3ee; border-color:#dce8de; }
+  .ai-card .card-title .ico { background:#dce9df; color:var(--accent); }
+  .ai-card p { font-size:11px; color:#56665a; line-height:1.6; margin:0 0 10px; }
+  .ai-action { display:flex; align-items:center; gap:8px; padding:8px 9px; background:#fffefa; border:1px solid #dce5dc; border-radius:7px; margin-top:6px; font-size:11px; color:#3d5c49; }
+  .ai-action span:last-child { margin-left:auto; color:#89968b; }
+  .board-preview { background:#fbfaf6; border:1px solid var(--line); border-radius:10px; padding:12px; height:138px; position:relative; overflow:hidden; }
+  .board-preview svg { position:absolute; inset:0; width:100%; height:100%; }
+  .pin { position:absolute; z-index:1; width:75px; padding:7px 6px; border:1px solid #dedbd1; background:#fffefa; border-radius:5px; font-size:9px; box-shadow:0 2px 5px #00000008; }
+  .pin b { display:block; font-size:10px; margin-bottom:3px; }
+  .pin.p1 { left:10px; top:13px; transform:rotate(-2deg); }
+  .pin.p2 { right:10px; top:21px; transform:rotate(2deg); }
+  .pin.p3 { left:65px; bottom:10px; transform:rotate(1deg); }
+  .pin.p4 { right:25px; bottom:11px; width:65px; }
+  .statusbar { display:flex; justify-content:space-between; gap:10px; padding:10px 28px; color:#8a8e86; font-size:10px; border-top:1px solid var(--line); background:#faf9f5; }
+  .status-left, .status-right { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .green-dot { display:inline-block; width:6px;height:6px;border-radius:50%;background:#6b9a76;margin-right:5px; }
+  @media (max-width: 1120px) {
+    .app { grid-template-columns:210px minmax(400px,1fr); }
+    .rightbar { display:none; }
+    .brand { width:165px; }
+  }
+  @media (max-width: 720px) {
+    .app { display:block; }
+    .topbar { padding:0 12px; gap:10px; height:58px; }
+    .brand { width:auto; font-size:17px; }
+    .project-switch { display:none; }
+    .search { margin-left:auto; max-width:170px; }
+    .search kbd, .top-actions .btn { display:none; }
+    .sidebar { display:none; }
+    .workspace-head { padding:18px 16px 12px; align-items:flex-start; }
+    h1 { font-size:23px; }
+    .head-actions .btn:not(.primary) { display:none; }
+    .tabs { padding:0 16px 12px; }
+    .document-wrap { padding:16px 12px 24px; }
+    .doc-page { padding:25px 22px 32px; }
+    .doc-page h2 { font-size:26px; }
+    .doc-page p { font-size:15px; }
+    .statusbar { padding:10px 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brandmark">t</span> trama</div>
+    <div class="project-switch"><span class="project-dot"></span><span style="font-size:12px;font-weight:650">La ciudad sumergida</span><span style="margin-left:auto;color:#8b9088">⌄</span></div>
+    <div class="search"><span>⌕</span><span>Buscar en todo el proyecto…</span><kbd>Ctrl K</kbd></div>
+    <div class="top-actions"><button class="btn">Compartir idea ↗</button><button class="btn">⋯</button><div class="avatar">AL</div></div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="section-label">Espacio de trabajo</div>
+    <div class="nav-item active"><span class="ico">▤</span> Escritorio</div>
+    <div class="nav-item"><span class="ico">▧</span> Documentos <span class="count">18</span></div>
+    <div class="nav-item"><span class="ico">⌘</span> Tablero de conexiones</div>
+    <div class="nav-item"><span class="ico">◷</span> Cronología</div>
+    <div class="nav-item"><span class="ico">⌕</span> Búsqueda avanzada</div>
+    <div class="section-label">Conocimiento</div>
+    <div class="nav-item"><span class="ico">♙</span> Personajes <span class="count">12</span></div>
+    <div class="nav-item"><span class="ico">⌖</span> Lugares <span class="count">7</span></div>
+    <div class="nav-item"><span class="ico">◈</span> Hechos e ideas <span class="count">24</span></div>
+    <div class="nav-item"><span class="ico">▣</span> Fuentes y bibliografía <span class="count">9</span></div>
+    <div class="nav-item"><span class="ico">▤</span> Notas y recortes <span class="count">31</span></div>
+    <div class="section-label">Revisión</div>
+    <div class="nav-item"><span class="ico">⟲</span> Versiones</div>
+    <div class="nav-item"><span class="ico">✓</span> Coherencia del proyecto</div>
+    <div class="nav-item"><span class="ico">✳</span> Herramientas de IA</div>
+    <div class="project-card">
+      <strong>Tu proyecto, siempre tuyo</strong>
+      <p>Los originales permanecen bajo tu control. La asistencia inteligente es opcional.</p>
+      <div class="progress"><span></span></div>
+      <p style="margin-top:7px">Estructura del proyecto · 64%</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="workspace-head">
+      <div>
+        <div class="crumb">La ciudad sumergida / Documentos / Capítulo 03</div>
+        <h1>El archivo de la lluvia</h1>
+      </div>
+      <div class="head-actions"><button class="btn">☆ Guardar referencia</button><button class="btn primary">＋ Nuevo</button></div>
+    </div>
+    <nav class="tabs">
+      <div class="tab active">Documento</div>
+      <div class="tab">Fragmentos vinculados <span style="font-size:10px">3</span></div>
+      <div class="tab">Anotaciones <span style="font-size:10px">2</span></div>
+      <div class="tab">Historial</div>
+    </nav>
+    <div class="document-wrap">
+      <div class="doc-toolbar">
+        <span class="tool">Párrafo⌄</span><span class="tool sep em">B</span><span class="tool"><i>I</i></span><span class="tool"><u>U</u></span><span class="tool">☷</span><span class="tool">❝</span><span class="tool sep">↗ Enlazar fragmento</span><span class="tool">✎ Anotar</span><span style="margin-left:auto;color:#8b9088;font-size:11px;padding:0 7px">Vista de escritura</span>
+      </div>
+      <article class="doc-page">
+        <div class="doc-meta"><span class="pill green">Borrador</span><span class="pill">Capítulo 03</span><span>Última edición: hoy, 10:42</span></div>
+        <h2>El archivo de la lluvia</h2>
+        <div class="subtitle">Capítulo tercero · Primera versión</div>
+        <p>La primera vez que Mara encontró el nombre de su madre en el archivo, pensó que se trataba de un error. El registro tenía fecha de hacía treinta y dos años, tres antes de que ella naciera, y una anotación escrita a mano en el margen.</p>
+        <p>La tinta se había extendido con la humedad, pero todavía podía leerse una frase: <span class="highlight">«No devolver al depósito hasta que el agua recuerde»</span><span class="inline-note">[A1]</span>.</p>
+        <p>Buscó el término en los inventarios antiguos. No aparecía en ningún catálogo oficial. Sin embargo, una referencia secundaria la llevó hasta <span class="highlight gold">el barrio de San Telmo, clausurado después de la inundación de 1987</span><span class="inline-note">[F2]</span>. En el margen de otro documento, alguien había dibujado el mismo símbolo que Mara llevaba años viendo en los sueños.</p>
+        <p>Entonces comprendió que no estaba investigando una desaparición. Estaba reconstruyendo una historia que alguien había dividido deliberadamente en piezas pequeñas, confiando en que nadie volvería a unirlas.</p>
+        <div class="doc-footer"><span>386 palabras · 2.418 caracteres</span><span>⌁ 3 vínculos · 2 anotaciones</span></div>
+      </article>
+    </div>
+    <footer class="statusbar">
+      <div class="status-left"><span><span class="green-dot"></span>Guardado local</span><span>Español</span><span>Sin conexión necesaria</span></div>
+      <div class="status-right"><span>100%</span><span>Enfoque de escritura</span></div>
+    </footer>
+  </main>
+
+  <aside class="rightbar">
+    <div class="right-head"><h3>Contexto del documento</h3><span class="quiet">Ocultar −</span></div>
+    <section class="context-card">
+      <div class="card-title"><span class="ico">⌘</span> Entidades relacionadas <span class="count">3</span></div>
+      <div class="entity"><span class="entity-dot" style="background:var(--rose)"></span><div><strong>Mara Vela</strong><small>Personaje · Protagonista</small></div><span class="mini-tag">2 vínculos</span></div>
+      <div class="entity"><span class="entity-dot" style="background:var(--blue)"></span><div><strong>San Telmo</strong><small>Lugar · Zona inundada</small></div><span class="mini-tag">4 vínculos</span></div>
+      <div class="entity"><span class="entity-dot" style="background:var(--gold)"></span><div><strong>La inundación de 1987</strong><small>Hecho · Historia local</small></div><span class="mini-tag">3 vínculos</span></div>
+      <div style="color:var(--accent);font-size:11px;font-weight:650;margin-top:7px">＋ Vincular entidad</div>
+    </section>
+    <section class="context-card">
+      <div class="card-title"><span class="ico">▣</span> Fuentes relacionadas <span class="count">2</span></div>
+      <div class="source-row"><div class="source-icon">▤</div><div><strong>Registro municipal de depósitos, 1984–1991</strong><small>Archivo local · Documento primario</small></div></div>
+      <div class="source-row"><div class="source-icon">↗</div><div><strong>Informe sobre las inundaciones de 1987</strong><small>Referencia externa · Pendiente de verificar</small></div></div>
+      <div style="color:var(--accent);font-size:11px;font-weight:650;margin-top:7px">＋ Añadir fuente</div>
+    </section>
+    <section class="context-card">
+      <div class="card-title"><span class="ico">⌁</span> Tablero de conexiones</div>
+      <div class="board-preview">
+        <svg viewBox="0 0 260 138" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M52 43 C70 57, 102 72, 104 103" stroke="#c49b57" stroke-width="1.5" fill="none"/>
+          <path d="M214 45 C180 56, 151 82, 105 103" stroke="#b96f68" stroke-width="1.5" fill="none"/>
+          <path d="M104 103 C144 112, 185 111, 220 111" stroke="#5c7fa5" stroke-width="1.5" fill="none"/>
+        </svg>
+        <div class="pin p1"><b>Registro</b><span>Fuente primaria</span></div>
+        <div class="pin p2"><b>San Telmo</b><span>Lugar</span></div>
+        <div class="pin p3"><b>La inundación</b><span>Hecho</span></div>
+        <div class="pin p4"><b>Mara</b><span>Personaje</span></div>
+      </div>
+      <div class="quiet" style="margin-top:8px">4 elementos · 3 relaciones</div>
+      <div style="color:var(--accent);font-size:11px;font-weight:650;margin-top:8px">Abrir tablero completo ↗</div>
+    </section>
+    <section class="context-card ai-card">
+      <div class="card-title"><span class="ico">✳</span> Asistencia opcional</div>
+      <p>Acciones concretas sobre el texto. Tú decides qué revisar y qué cambios aceptar.</p>
+      <div class="ai-action"><span>✓</span><span>Revisar coherencia</span><span>↗</span></div>
+      <div class="ai-action"><span>✎</span><span>Valorar estilo</span><span>↗</span></div>
+      <div class="ai-action"><span>⌕</span><span>Buscar contradicciones</span><span>↗</span></div>
+      <div class="quiet" style="margin-top:9px">El texto original no se modifica automáticamente.</div>
+    </section>
+  </aside>
+</div>
+</body>
+</html>
