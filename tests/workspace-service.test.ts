@@ -124,4 +124,105 @@ describe("WorkspaceService", () => {
 
     expect(result).toEqual(document);
   });
+  
+  it("guarda y consulta versiones de un documento", async () => {
+    const { service } = createService();
+
+    const project = await service.createProject({ title: "Mi proyecto" });
+    const document = await service.createDocument({
+      projectId: project.id,
+      title: "Borrador",
+      text: "Una idea inicial."
+    });
+
+    const version = await service.saveDocumentVersion(document.id, {
+      label: "Primera idea"
+    });
+
+    const versions = await service.listDocumentVersions(document.id);
+
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toEqual(version);
+    expect(version.label).toBe("Primera idea");
+    expect(version.text).toBe("Una idea inicial.");
+  });
+
+  it("evita versiones automáticas duplicadas del mismo contenido", async () => {
+    const { service } = createService();
+
+    const project = await service.createProject({ title: "Mi proyecto" });
+    const document = await service.createDocument({
+      projectId: project.id,
+      title: "Borrador",
+      text: "La misma idea."
+    });
+
+    const first = await service.saveDocumentVersion(document.id);
+    const second = await service.saveDocumentVersion(document.id);
+
+    expect(second.id).toBe(first.id);
+    expect(await service.listDocumentVersions(document.id)).toHaveLength(1);
+  });
+
+  it("conserva el estado actual antes de recuperar una versión antigua", async () => {
+    const { service } = createService();
+
+    const project = await service.createProject({ title: "Mi proyecto" });
+    const document = await service.createDocument({
+      projectId: project.id,
+      title: "Primera idea",
+      text: "Un camino narrativo."
+    });
+
+    const firstVersion = await service.saveDocumentVersion(document.id, {
+      label: "Primera idea"
+    });
+
+    await service.updateDocument(document.id, {
+      title: "Nueva idea",
+      text: "Un camino distinto."
+    });
+
+    const restored = await service.restoreDocumentVersion(
+      document.id,
+      firstVersion.id
+    );
+
+    expect(restored.title).toBe("Primera idea");
+    expect(restored.text).toBe("Un camino narrativo.");
+
+    const versions = await service.listDocumentVersions(document.id);
+
+    expect(versions).toHaveLength(2);
+    expect(versions.some(
+      (version) =>
+        version.title === "Nueva idea" &&
+        version.text === "Un camino distinto."
+    )).toBe(true);
+  });
+
+  it("rechaza recuperar una versión de otro documento", async () => {
+    const { service } = createService();
+
+    const project = await service.createProject({ title: "Mi proyecto" });
+    const first = await service.createDocument({
+      projectId: project.id,
+      title: "Documento uno",
+      text: "Texto uno."
+    });
+    const second = await service.createDocument({
+      projectId: project.id,
+      title: "Documento dos",
+      text: "Texto dos."
+    });
+
+    const version = await service.saveDocumentVersion(first.id);
+
+    await expect(
+      service.restoreDocumentVersion(second.id, version.id)
+    ).rejects.toThrow(
+      "La versión solicitada no pertenece a este documento."
+    );
+  });
+
 });

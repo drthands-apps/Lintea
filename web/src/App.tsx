@@ -1,35 +1,134 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { DocumentRecord, Id } from "../../src/core/model.js";
+import { MemoryProjectStorage } from "../../src/core/memory-storage.js";
+import { WorkspaceService } from "../../src/application/workspace-service.js";
 
-const initialDocuments = [
-  {
-    id: "doc-1",
-    title: "Una idea por desarrollar",
-    text: "Toda historia comienza con una pregunta.\n\n¿Qué merece ser recordado? ¿Qué cambia cuando descubrimos una respuesta inesperada?",
-    category: "Notas"
-  },
-  {
-    id: "doc-2",
-    title: "Investigación inicial",
-    text: "Reunir fuentes, registrar las referencias y distinguir los hechos comprobados de las hipótesis.",
-    category: "Investigación"
-  },
-  {
-    id: "doc-3",
-    title: "Fragmentos sueltos",
-    text: "Imágenes, frases y observaciones que todavía no encuentran su lugar.",
-    category: "Fragmentos"
+type EditorDocument = DocumentRecord & {
+  category: string;
+};
+
+const storage = new MemoryProjectStorage();
+const workspace = new WorkspaceService(storage);
+
+let initialization: Promise<{
+  projectId: Id;
+  documents: EditorDocument[];
+}> | undefined;
+
+function initializeWorkspace() {
+  if (!initialization) {
+    initialization = (async () => {
+      let projects = await workspace.listProjects();
+
+      if (projects.length === 0) {
+        const project = await workspace.createProject({
+          title: "Mi espacio de escritura"
+        });
+
+        const examples = [
+          {
+            title: "Una idea por desarrollar",
+            text: "Toda historia comienza con una pregunta.\n\n¿Qué merece ser recordado? ¿Qué cambia cuando descubrimos una respuesta inesperada?",
+            category: "Notas"
+          },
+          {
+            title: "Investigación inicial",
+            text: "Reunir fuentes, registrar las referencias y distinguir los hechos comprobados de las hipótesis.",
+            category: "Investigación"
+          },
+          {
+            title: "Fragmentos sueltos",
+            text: "Imágenes, frases y observaciones que todavía no encuentran su lugar.",
+            category: "Fragmentos"
+          }
+        ];
+
+        for (const example of examples) {
+          await workspace.createDocument({
+            projectId: project.id,
+            title: example.title,
+            text: example.text
+          });
+        }
+
+        projects = await workspace.listProjects();
+      }
+
+      const project = projects[0];
+
+      if (!project) {
+        throw new Error("No se pudo inicializar el espacio de trabajo.");
+      }
+
+      const documents = await workspace.listDocuments(project.id);
+
+      return {
+        projectId: project.id,
+        documents: documents.map((document) => ({
+          ...document,
+          category:
+            document.title === "Investigación inicial"
+              ? "Investigación"
+              : document.title === "Fragmentos sueltos"
+                ? "Fragmentos"
+                : "Notas"
+        }))
+      };
+    })().catch((error: unknown) => {
+      initialization = undefined;
+      throw error;
+    });
   }
-];
+
+  return initialization;
+}
 
 export default function App() {
-  const [documents, setDocuments] = useState(initialDocuments);
-  const [activeId, setActiveId] = useState("doc-1");
+  const [projectId, setProjectId] = useState<Id | null>(null);
+  const [documents, setDocuments] = useState<EditorDocument[]>([]);
+  const [activeId, setActiveId] = useState<Id | null>(null);
   const [showContext, setShowContext] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const activeDocument = documents.find((doc) => doc.id === activeId);
 
-  function updateActiveDocument(field: "title" | "text", value: string) {
+  useEffect(() => {
+    let cancelled = false;
+
+    initializeWorkspace()
+      .then((result) => {
+        if (cancelled) return;
+
+        setProjectId(result.projectId);
+        setDocuments(result.documents);
+        setActiveId(result.documents[0]?.id ?? null);
+        setError(null);
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
+
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "No se pudo cargar el espacio de trabajo."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function updateActiveDocument(
+    field: "title" | "text",
+    value: string
+  ) {
     setDocuments((current) =>
       current.map((doc) =>
         doc.id === activeId ? { ...doc, [field]: value } : doc
@@ -37,20 +136,72 @@ export default function App() {
     );
   }
 
-  function createDocument() {
-    const id = crypto.randomUUID();
+  async function saveActiveDocument() {
+    if (!activeDocument) return;
 
-    setDocuments((current) => [
-      ...current,
-      {
-        id,
+    setSaving(true);
+    setError(null);
+
+    try {
+      const updated = await workspace.updateDocument(activeDocument.id, {
+        title: activeDocument.title,
+        text: activeDocument.text
+      });
+
+      setDocuments((current) =>
+        current.map((doc) =>
+          doc.id === updated.id
+            ? { ...doc, ...updated }
+            : doc
+        )
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo guardar el documento."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createDocument() {
+    if (!projectId) return;
+
+    setError(null);
+
+    try {
+      const created = await workspace.createDocument({
+        projectId,
         title: "Documento sin título",
-        text: "",
-        category: "Notas"
-      }
-    ]);
+        text: ""
+      });
 
-    setActiveId(id);
+      const editorDocument: EditorDocument = {
+        ...created,
+        category: "Notas"
+      };
+
+      setDocuments((current) => [...current, editorDocument]);
+      setActiveId(created.id);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo crear el documento."
+      );
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <main className="workspace">
+          <p>Cargando tu espacio de escritura…</p>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -65,17 +216,17 @@ export default function App() {
         </div>
 
         <div className="project-label">PROYECTO ACTUAL</div>
-        <button className="project-button">
+        <div className="project-button">
           <span className="project-dot" />
           Mi espacio de escritura
           <span className="chevron">⌄</span>
-        </button>
+        </div>
 
         <div className="section-heading">
           <span>Biblioteca</span>
           <button
             className="icon-button"
-            onClick={createDocument}
+            onClick={() => void createDocument()}
             aria-label="Crear documento"
             title="Crear documento"
           >
@@ -92,7 +243,7 @@ export default function App() {
             >
               <span className="document-icon">▤</span>
               <span className="document-info">
-                <span className="document-title">{doc.title}</span>
+                <span className="document-title">{doc.title || "Sin título"}</span>
                 <span className="document-category">{doc.category}</span>
               </span>
             </button>
@@ -117,7 +268,9 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
-            <span className="save-status">● Cambios en memoria</span>
+            <span className="save-status">
+              ● {saving ? "Guardando…" : "Almacenamiento en memoria"}
+            </span>
             <button
               className="context-toggle"
               onClick={() => setShowContext((visible) => !visible)}
@@ -127,12 +280,18 @@ export default function App() {
           </div>
         </header>
 
+        {error && (
+          <div role="alert" className="error-message">
+            {error}
+          </div>
+        )}
+
         <div className={`editor-layout ${showContext ? "" : "context-hidden"}`}>
           <section className="editor">
             <div className="editor-meta">
               <span className="eyebrow">DOCUMENTO DE TRABAJO</span>
               <span className="meta-divider">·</span>
-              <span>{activeDocument?.category}</span>
+              <span>{activeDocument?.category ?? "Documento"}</span>
             </div>
 
             {activeDocument ? (
@@ -144,6 +303,7 @@ export default function App() {
                   onChange={(event) =>
                     updateActiveDocument("title", event.target.value)
                   }
+                  onBlur={() => void saveActiveDocument()}
                   placeholder="Título del documento"
                 />
 
@@ -156,12 +316,13 @@ export default function App() {
                   onChange={(event) =>
                     updateActiveDocument("text", event.target.value)
                   }
+                  onBlur={() => void saveActiveDocument()}
                   placeholder="Empieza a escribir tus ideas..."
                   spellCheck
                 />
 
                 <div className="editor-footer">
-                  <span>El contenido aún no se guarda en disco.</span>
+                  <span>Los cambios se guardan al salir del campo.</span>
                   <span>{activeDocument.text.length} caracteres</span>
                 </div>
               </>
@@ -169,7 +330,10 @@ export default function App() {
               <div className="empty-state">
                 <h2>Tu siguiente idea empieza aquí</h2>
                 <p>Crea un documento para comenzar a escribir.</p>
-                <button className="primary-button" onClick={createDocument}>
+                <button
+                  className="primary-button"
+                  onClick={() => void createDocument()}
+                >
                   Crear documento
                 </button>
               </div>
@@ -189,8 +353,7 @@ export default function App() {
                   <h2>Ideas relacionadas</h2>
                 </div>
                 <p className="muted-copy">
-                  Las conexiones que establezcas entre tus notas aparecerán
-                  aquí.
+                  Las conexiones que establezcas entre tus notas aparecerán aquí.
                 </p>
                 <button className="outline-button" disabled>
                   + Añadir relación
@@ -216,8 +379,7 @@ export default function App() {
                   <h2>Actividad</h2>
                 </div>
                 <p className="muted-copy">
-                  El historial de versiones estará disponible en una próxima
-                  etapa.
+                  El historial de versiones estará disponible en una próxima etapa.
                 </p>
               </section>
 
@@ -226,8 +388,7 @@ export default function App() {
                 <p>
                   <strong>Un espacio para pensar.</strong>
                   <br />
-                  Lintea organiza tus ideas sin decidir por ti qué debes
-                  escribir.
+                  Lintea organiza tus ideas sin decidir por ti qué debes escribir.
                 </p>
               </div>
             </aside>

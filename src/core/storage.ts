@@ -1,5 +1,6 @@
 
 import type { DocumentRecord, Id, Project } from "./model.js";
+import type { DocumentVersion } from "./versions.js";
 
 export interface ProjectStorage {
   listProjects(): Promise<Project[]>;
@@ -15,4 +16,10 @@ export interface ProjectStorage {
   createDocument(document: DocumentRecord): Promise<void>;
 
   updateDocument(document: DocumentRecord): Promise<void>;
+
+  listDocumentVersions(documentId: Id): Promise<DocumentVersion[]>;
+
+  getDocumentVersion(versionId: Id): Promise<DocumentVersion | null>;
+
+  createDocumentVersion(version: DocumentVersion): Promise<void>;
 }

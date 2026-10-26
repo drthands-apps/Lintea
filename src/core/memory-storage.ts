@@ -1,10 +1,16 @@
 
-import type { DocumentRecord, Id, Project } from "./model.js";
+import type {
+  DocumentRecord,
+  Id,
+  Project
+} from "./model.js";
+import type { DocumentVersion } from "./versions.js";
 import type { ProjectStorage } from "./storage.js";
 
 export class MemoryProjectStorage implements ProjectStorage {
   private readonly projects = new Map<Id, Project>();
   private readonly documents = new Map<Id, DocumentRecord>();
+  private readonly versions = new Map<Id, DocumentVersion>();
 
   async listProjects(): Promise<Project[]> {
     return [...this.projects.values()].map((project) => ({ ...project }));
@@ -56,5 +62,35 @@ export class MemoryProjectStorage implements ProjectStorage {
     }
 
     this.documents.set(document.id, { ...document });
+  }
+
+  async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
+    return [...this.versions.values()]
+      .filter((version) => version.documentId === documentId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((version) => ({ ...version }));
+  }
+
+  async getDocumentVersion(versionId: Id): Promise<DocumentVersion | null> {
+    const version = this.versions.get(versionId);
+    return version ? { ...version } : null;
+  }
+
+  async createDocumentVersion(version: DocumentVersion): Promise<void> {
+    if (this.versions.has(version.id)) {
+      throw new Error("Ya existe una versión con ese identificador.");
+    }
+
+    const document = this.documents.get(version.documentId);
+
+    if (!document) {
+      throw new Error("El documento de la versión no existe.");
+    }
+
+    if (document.projectId !== version.projectId) {
+      throw new Error("El proyecto de la versión no coincide con el documento.");
+    }
+
+    this.versions.set(version.id, { ...version });
   }
 }
