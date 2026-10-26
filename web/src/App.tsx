@@ -1,0 +1,239 @@
+
+import { useState } from "react";
+
+const initialDocuments = [
+  {
+    id: "doc-1",
+    title: "Una idea por desarrollar",
+    text: "Toda historia comienza con una pregunta.\n\n¿Qué merece ser recordado? ¿Qué cambia cuando descubrimos una respuesta inesperada?",
+    category: "Notas"
+  },
+  {
+    id: "doc-2",
+    title: "Investigación inicial",
+    text: "Reunir fuentes, registrar las referencias y distinguir los hechos comprobados de las hipótesis.",
+    category: "Investigación"
+  },
+  {
+    id: "doc-3",
+    title: "Fragmentos sueltos",
+    text: "Imágenes, frases y observaciones que todavía no encuentran su lugar.",
+    category: "Fragmentos"
+  }
+];
+
+export default function App() {
+  const [documents, setDocuments] = useState(initialDocuments);
+  const [activeId, setActiveId] = useState("doc-1");
+  const [showContext, setShowContext] = useState(true);
+
+  const activeDocument = documents.find((doc) => doc.id === activeId);
+
+  function updateActiveDocument(field: "title" | "text", value: string) {
+    setDocuments((current) =>
+      current.map((doc) =>
+        doc.id === activeId ? { ...doc, [field]: value } : doc
+      )
+    );
+  }
+
+  function createDocument() {
+    const id = crypto.randomUUID();
+
+    setDocuments((current) => [
+      ...current,
+      {
+        id,
+        title: "Documento sin título",
+        text: "",
+        category: "Notas"
+      }
+    ]);
+
+    setActiveId(id);
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">L</div>
+          <div>
+            <strong>lintea</strong>
+            <span>Tu espacio de trabajo</span>
+          </div>
+        </div>
+
+        <div className="project-label">PROYECTO ACTUAL</div>
+        <button className="project-button">
+          <span className="project-dot" />
+          Mi espacio de escritura
+          <span className="chevron">⌄</span>
+        </button>
+
+        <div className="section-heading">
+          <span>Biblioteca</span>
+          <button
+            className="icon-button"
+            onClick={createDocument}
+            aria-label="Crear documento"
+            title="Crear documento"
+          >
+            +
+          </button>
+        </div>
+
+        <nav className="document-list" aria-label="Documentos">
+          {documents.map((doc) => (
+            <button
+              key={doc.id}
+              className={`document-item ${doc.id === activeId ? "active" : ""}`}
+              onClick={() => setActiveId(doc.id)}
+            >
+              <span className="document-icon">▤</span>
+              <span className="document-info">
+                <span className="document-title">{doc.title}</span>
+                <span className="document-category">{doc.category}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="local-indicator">
+            <span />
+            Espacio local
+          </div>
+          <span className="version-label">LINTEA · PROTOTIPO</span>
+        </div>
+      </aside>
+
+      <main className="workspace">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <span>Mi espacio</span>
+            <span className="breadcrumb-separator">/</span>
+            <span>{activeDocument?.category ?? "Documento"}</span>
+          </div>
+
+          <div className="topbar-actions">
+            <span className="save-status">● Cambios en memoria</span>
+            <button
+              className="context-toggle"
+              onClick={() => setShowContext((visible) => !visible)}
+            >
+              {showContext ? "Ocultar contexto" : "Mostrar contexto"}
+            </button>
+          </div>
+        </header>
+
+        <div className={`editor-layout ${showContext ? "" : "context-hidden"}`}>
+          <section className="editor">
+            <div className="editor-meta">
+              <span className="eyebrow">DOCUMENTO DE TRABAJO</span>
+              <span className="meta-divider">·</span>
+              <span>{activeDocument?.category}</span>
+            </div>
+
+            {activeDocument ? (
+              <>
+                <input
+                  className="title-input"
+                  aria-label="Título del documento"
+                  value={activeDocument.title}
+                  onChange={(event) =>
+                    updateActiveDocument("title", event.target.value)
+                  }
+                  placeholder="Título del documento"
+                />
+
+                <div className="editor-divider" />
+
+                <textarea
+                  className="document-editor"
+                  aria-label="Contenido del documento"
+                  value={activeDocument.text}
+                  onChange={(event) =>
+                    updateActiveDocument("text", event.target.value)
+                  }
+                  placeholder="Empieza a escribir tus ideas..."
+                  spellCheck
+                />
+
+                <div className="editor-footer">
+                  <span>El contenido aún no se guarda en disco.</span>
+                  <span>{activeDocument.text.length} caracteres</span>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <h2>Tu siguiente idea empieza aquí</h2>
+                <p>Crea un documento para comenzar a escribir.</p>
+                <button className="primary-button" onClick={createDocument}>
+                  Crear documento
+                </button>
+              </div>
+            )}
+          </section>
+
+          {showContext && (
+            <aside className="context-panel">
+              <div className="context-header">
+                <span className="eyebrow">PANEL CONTEXTUAL</span>
+                <span className="context-menu">···</span>
+              </div>
+
+              <section className="context-section">
+                <div className="context-section-title">
+                  <span className="context-symbol">◇</span>
+                  <h2>Ideas relacionadas</h2>
+                </div>
+                <p className="muted-copy">
+                  Las conexiones que establezcas entre tus notas aparecerán
+                  aquí.
+                </p>
+                <button className="outline-button" disabled>
+                  + Añadir relación
+                </button>
+              </section>
+
+              <section className="context-section">
+                <div className="context-section-title">
+                  <span className="context-symbol">▤</span>
+                  <h2>Fuentes</h2>
+                </div>
+                <p className="muted-copy">
+                  Guarda referencias y fuentes para documentar tus ideas.
+                </p>
+                <button className="outline-button" disabled>
+                  + Añadir fuente
+                </button>
+              </section>
+
+              <section className="context-section">
+                <div className="context-section-title">
+                  <span className="context-symbol">◷</span>
+                  <h2>Actividad</h2>
+                </div>
+                <p className="muted-copy">
+                  El historial de versiones estará disponible en una próxima
+                  etapa.
+                </p>
+              </section>
+
+              <div className="context-note">
+                <span className="note-icon">✳</span>
+                <p>
+                  <strong>Un espacio para pensar.</strong>
+                  <br />
+                  Lintea organiza tus ideas sin decidir por ti qué debes
+                  escribir.
+                </p>
+              </div>
+            </aside>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
