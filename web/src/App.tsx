@@ -2,14 +2,32 @@
 import { useEffect, useState } from "react";
 import type { DocumentRecord, Id } from "../../src/core/model.js";
 import { MemoryProjectStorage } from "../../src/core/memory-storage.js";
+import { SqliteProjectStorage } from "../../src/adapters/sqlite-project-storage.js";
 import { WorkspaceService } from "../../src/application/workspace-service.js";
+import type { ProjectStorage } from "../../src/core/storage.js";
 
 type EditorDocument = DocumentRecord & {
   category: string;
 };
 
-const storage = new MemoryProjectStorage();
-const workspace = new WorkspaceService(storage);
+let workspace: WorkspaceService | undefined;
+
+async function getWorkspace(): Promise<WorkspaceService> {
+  if (!workspace) {
+    workspace = new WorkspaceService(await createStorage());
+  }
+
+  return workspace;
+}
+
+async function createStorage(): Promise<ProjectStorage> {
+   console.log("[Lintea] Comprobando el entorno");
+  if ("__TAURI_INTERNALS__" in window) {
+    return SqliteProjectStorage.create();
+  }
+  console.log("[Lintea] Usando almacenamiento en memoria");
+  return new MemoryProjectStorage();
+}
 
 let initialization: Promise<{
   projectId: Id;
@@ -19,6 +37,7 @@ let initialization: Promise<{
 function initializeWorkspace() {
   if (!initialization) {
     initialization = (async () => {
+      const workspace = await getWorkspace();
       let projects = await workspace.listProjects();
 
       if (projects.length === 0) {
@@ -76,9 +95,10 @@ function initializeWorkspace() {
         }))
       };
     })().catch((error: unknown) => {
-      initialization = undefined;
-      throw error;
-    });
+  initialization = undefined;
+  console.error("[Lintea] Error al inicializar:", error);
+  throw error;
+});
   }
 
   return initialization;
@@ -108,14 +128,17 @@ export default function App() {
         setError(null);
       })
       .catch((reason: unknown) => {
-        if (cancelled) return;
+  if (cancelled) return;
 
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "No se pudo cargar el espacio de trabajo."
-        );
-      })
+  console.error("[Lintea] Error al cargar el espacio de trabajo:", reason);
+
+  const detail =
+    reason instanceof Error
+      ? `${reason.name}: ${reason.message}`
+      : String(reason);
+
+  setError(`No se pudo cargar el espacio de trabajo. Detalle: ${detail}`);
+})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -138,7 +161,7 @@ export default function App() {
 
   async function saveActiveDocument() {
     if (!activeDocument) return;
-
+    const workspace = await getWorkspace();
     setSaving(true);
     setError(null);
 
@@ -168,7 +191,7 @@ export default function App() {
 
   async function createDocument() {
     if (!projectId) return;
-
+    const workspace = await getWorkspace();
     setError(null);
 
     try {

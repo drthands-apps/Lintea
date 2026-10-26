@@ -6,7 +6,8 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "sql:default"
-  ]
+  "core:default",
+  "sql:default",
+  "sql:allow-execute"
+]
 }
