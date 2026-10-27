@@ -1,10 +1,16 @@
-import type { DocumentRecord, Id, Project } from "./model.js";
+
+import type {
+  DocumentRecord,
+  Id,
+  Project,
+  ProjectContext
+} from "./model.js";
 import { createId } from "./model.js";
 
 export interface CreateProjectInput {
   title: string;
+  context?: ProjectContext;
 }
-
 export interface CreateDocumentInput {
   projectId: Id;
   title: string;
@@ -34,6 +40,30 @@ function requireValidDate(date: Date): string {
   return date.toISOString();
 }
 
+function copyProjectContext(context?: ProjectContext): ProjectContext {
+  if (!context) {
+    return {
+      kind: "other",
+      primaryLanguage: "und",
+      additionalLanguages: [],
+      editorialStyle: "classic"
+    };
+  }
+
+  const primaryLanguage = requireText(
+    context.primaryLanguage,
+    "El idioma principal"
+  );
+
+  return {
+    ...context,
+    primaryLanguage,
+    additionalLanguages: context.additionalLanguages.map((language) =>
+      requireText(language, "El idioma adicional")
+    )
+  };
+}
+
 export function createProject(
   input: CreateProjectInput,
   now: () => Date = () => new Date()
@@ -44,8 +74,72 @@ export function createProject(
     id: createId(),
     title: requireText(input.title, "El título del proyecto"),
     createdAt: timestamp,
-    updatedAt: timestamp
+    updatedAt: timestamp,
+    context: copyProjectContext(input.context)
   };
+}
+
+export interface UpdateProjectInput {
+  title?: string;
+  context?: ProjectContext;
+}
+
+export function updateProject(
+  projects: Project[],
+  projectId: Id,
+  changes: UpdateProjectInput,
+  now: () => Date = () => new Date()
+): Project[] {
+  const index = projects.findIndex(
+    (project) => project.id === projectId
+  );
+
+  if (index === -1) {
+    throw new Error("No se puede actualizar un proyecto que no existe.");
+  }
+
+  const current = projects[index];
+
+  const title =
+    changes.title === undefined
+      ? current.title
+      : requireText(changes.title, "El título del proyecto");
+
+  const context =
+    changes.context === undefined
+      ? copyProjectContext(current.context)
+      : copyProjectContext(changes.context);
+
+  const currentContext = copyProjectContext(current.context);
+
+const sameContext =
+  context.kind === currentContext.kind &&
+  context.primaryLanguage === currentContext.primaryLanguage &&
+  context.editorialStyle === currentContext.editorialStyle &&
+  context.additionalLanguages.length ===
+    currentContext.additionalLanguages.length &&
+  context.additionalLanguages.every(
+    (language, index) =>
+      language === currentContext.additionalLanguages[index]
+  );
+
+  if (title === current.title && sameContext) {
+    return projects;
+  }
+
+  const updatedAt = requireValidDate(now());
+
+  const updatedProject: Project = {
+    ...current,
+    title,
+    context,
+    updatedAt
+  };
+
+  const updatedProjects = [...projects];
+  updatedProjects[index] = updatedProject;
+
+  return updatedProjects;
 }
 
 export function createDocument(

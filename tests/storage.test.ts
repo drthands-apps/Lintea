@@ -48,6 +48,34 @@ describe("MemoryProjectStorage", () => {
     expect(await storage.listDocuments(project.id)).toEqual([document]);
   });
 
+  it("aísla el contexto de los proyectos recuperados", async () => {
+  const storage = new MemoryProjectStorage();
+
+  const projectWithContext: Project = {
+    ...project,
+    context: {
+      kind: "fiction",
+      primaryLanguage: "es",
+      additionalLanguages: ["en"],
+      editorialStyle: "classic"
+    }
+  };
+
+  await storage.createProject(projectWithContext);
+
+  const recovered = await storage.getProject(project.id);
+
+  if (!recovered?.context) {
+    throw new Error("El proyecto debería tener contexto.");
+  }
+
+  recovered.context.additionalLanguages.push("fr");
+
+  const saved = await storage.getProject(project.id);
+
+  expect(saved?.context?.additionalLanguages).toEqual(["en"]);
+});
+
   it("rechaza documentos cuyo proyecto no existe", async () => {
     const storage = new MemoryProjectStorage();
 

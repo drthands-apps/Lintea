@@ -4,8 +4,10 @@ import {
   addDocument,
   createDocument,
   createProject,
-  updateDocument
+  updateDocument,
+  updateProject
 } from "../src/core/projects.js";
+
 import type { ProjectWorkspace } from "../src/core/projects.js";
 
 const fixedDate = new Date("2026-01-15T10:00:00.000Z");
@@ -130,6 +132,81 @@ describe("actualización de documentos", () => {
 
     return addDocument(workspace, document);
   }
+
+  describe("actualización de proyectos", () => {
+  it("actualiza el contexto y conserva la identidad y fecha de creación", () => {
+    const workspace = createWorkspace();
+    const original = workspace.projects[0];
+    const laterDate = new Date("2026-01-16T12:00:00.000Z");
+
+    const updatedProjects = updateProject(
+      workspace.projects,
+      original.id,
+      {
+        context: {
+          kind: "fiction",
+          primaryLanguage: "es",
+          additionalLanguages: ["en", "fr"],
+          editorialStyle: "modern"
+        }
+      },
+      () => new Date(laterDate)
+    );
+
+    const updated = updatedProjects[0];
+
+    expect(updated.context).toEqual({
+      kind: "fiction",
+      primaryLanguage: "es",
+      additionalLanguages: ["en", "fr"],
+      editorialStyle: "modern"
+    });
+    expect(updated.id).toBe(original.id);
+    expect(updated.createdAt).toBe(original.createdAt);
+    expect(updated.updatedAt).toBe(laterDate.toISOString());
+    expect(original.context).toBeUndefined();
+  });
+
+  it("no cambia las fechas si el proyecto no cambia", () => {
+    const workspace = createWorkspace();
+    const original = workspace.projects[0];
+
+    const result = updateProject(
+      workspace.projects,
+      original.id,
+      { title: original.title },
+      () => new Date("2026-02-01T00:00:00.000Z")
+    );
+
+    expect(result).toBe(workspace.projects);
+    expect(result[0].createdAt).toBe(original.createdAt);
+    expect(result[0].updatedAt).toBe(original.updatedAt);
+  });
+
+  it("rechaza un título vacío", () => {
+    const workspace = createWorkspace();
+
+    expect(() =>
+      updateProject(
+        workspace.projects,
+        "project-1",
+        { title: "   " },
+        fixedClock
+      )
+    ).toThrow("El título del proyecto no puede estar vacío.");
+  });
+
+  it("rechaza un proyecto inexistente", () => {
+    expect(() =>
+      updateProject(
+        createWorkspace().projects,
+        "missing-project",
+        { title: "Nuevo título" },
+        fixedClock
+      )
+    ).toThrow("No se puede actualizar un proyecto que no existe.");
+  });
+});
 
   it("actualiza el texto y la fecha sin cambiar la identidad", () => {
     const workspace = workspaceWithDocument();

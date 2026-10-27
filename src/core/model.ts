@@ -24,11 +24,31 @@ export type RelationKind =
   | "related_to"
   | "inspired_by";
 
+export type ProjectKind =
+  | "fiction"
+  | "research"
+  | "essay"
+  | "report"
+  | "documentation"
+  | "other";
+
+export type EditorialStyle =
+  | "classic"
+  | "modern";
+
+export interface ProjectContext {
+  kind: ProjectKind;
+  primaryLanguage: string;
+  additionalLanguages: string[];
+  editorialStyle: EditorialStyle;
+}
+
 export interface Project {
   id: Id;
   title: string;
   createdAt: string;
   updatedAt: string;
+  context?: ProjectContext;
 }
 
 export interface DocumentRecord {

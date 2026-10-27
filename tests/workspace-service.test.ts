@@ -31,6 +31,86 @@ describe("WorkspaceService", () => {
     expect(project.title).toBe("Mi proyecto");
   });
 
+  it("actualiza el contexto de un proyecto y conserva su fecha de creación", async () => {
+  const { service } = createService();
+
+  const project = await service.createProject({
+    title: "Mi proyecto"
+  });
+
+  const updated = await service.updateProject(project.id, {
+  context: {
+    kind: "fiction",
+    primaryLanguage: "es",
+    additionalLanguages: ["en", "fr"],
+    editorialStyle: "modern"
+  }
+});
+
+  expect(updated.context).toEqual({
+    kind: "fiction",
+    primaryLanguage: "es",
+    additionalLanguages: ["en", "fr"],
+    editorialStyle: "modern"
+  });
+
+  expect(updated.createdAt).toBe(project.createdAt);
+  expect(updated.updatedAt).not.toBe(project.updatedAt);
+
+  await expect(service.listProjects()).resolves.toContainEqual(updated);
+});
+
+it("no cambia las fechas si el proyecto no se modifica", async () => {
+  const { service } = createService();
+
+  const project = await service.createProject({
+    title: "Mi proyecto"
+  });
+
+  const result = await service.updateProject(project.id, {
+    title: project.title
+  });
+
+  expect(result).toEqual(project);
+  expect(result.createdAt).toBe(project.createdAt);
+  expect(result.updatedAt).toBe(project.updatedAt);
+
+  await expect(service.listProjects()).resolves.toContainEqual(project);
+});
+
+it("actualiza el título y conserva las fechas correctamente", async () => {
+  const { service } = createService();
+
+  const project = await service.createProject({
+    title: "Mi proyecto"
+  });
+
+  const updated = await service.updateProject(project.id, {
+    title: "Mi proyecto revisado"
+  });
+
+  expect(updated.title).toBe("Mi proyecto revisado");
+  expect(updated.id).toBe(project.id);
+  expect(updated.createdAt).toBe(project.createdAt);
+  expect(updated.updatedAt).not.toBe(project.updatedAt);
+
+  await expect(service.listProjects()).resolves.toContainEqual(updated);
+});
+
+
+it("rechaza actualizar un proyecto inexistente", async () => {
+  const { service } = createService();
+
+  await expect(
+  service.updateProject("proyecto-inexistente", {
+    title: "Nuevo título"
+  })
+).rejects.toThrow(
+  "No se puede actualizar un proyecto que no existe."
+);
+});
+
+
   it("crea un documento dentro de un proyecto existente", async () => {
     const { service } = createService();
 

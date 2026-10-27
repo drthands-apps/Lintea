@@ -7,29 +7,51 @@ import type {
 import type { DocumentVersion } from "./versions.js";
 import type { ProjectStorage } from "./storage.js";
 
+function copyProject(project: Project): Project {
+  return {
+    ...project,
+    context: project.context
+      ? {
+          ...project.context,
+          additionalLanguages: [
+            ...project.context.additionalLanguages
+          ]
+        }
+      : undefined
+  };
+}
+
 export class MemoryProjectStorage implements ProjectStorage {
   private readonly projects = new Map<Id, Project>();
   private readonly documents = new Map<Id, DocumentRecord>();
   private readonly versions = new Map<Id, DocumentVersion>();
 
   async listProjects(): Promise<Project[]> {
-    return [...this.projects.values()].map((project) => ({ ...project }));
-  }
+  return [...this.projects.values()].map(copyProject);
+}
 
   async getProject(projectId: Id): Promise<Project | null> {
-    const project = this.projects.get(projectId);
-    return project ? { ...project } : null;
-  }
+  const project = this.projects.get(projectId);
+  return project ? copyProject(project) : null;
+}
 
   async createProject(project: Project): Promise<void> {
     if (this.projects.has(project.id)) {
       throw new Error("Ya existe un proyecto con ese identificador.");
     }
 
-    this.projects.set(project.id, { ...project });
+    this.projects.set(project.id, copyProject(project));
   }
 
-  async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
+  async updateProject(project: Project): Promise<void> {
+  if (!this.projects.has(project.id)) {
+    throw new Error("No se puede actualizar un proyecto que no existe.");
+  }
+
+  this.projects.set(project.id, copyProject(project));
+}
+
+async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     return [...this.documents.values()]
       .filter((document) => document.projectId === projectId)
       .map((document) => ({ ...document }));

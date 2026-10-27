@@ -9,6 +9,8 @@ export interface ProjectStorage {
 
   createProject(project: Project): Promise<void>;
 
+  updateProject(project: Project): Promise<void>;
+
   listDocuments(projectId: Id): Promise<DocumentRecord[]>;
 
   getDocument(documentId: Id): Promise<DocumentRecord | null>;

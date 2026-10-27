@@ -3,12 +3,14 @@ import type { DocumentRecord, Id, Project } from "../core/model.js";
 import {
   createDocument as buildDocument,
   createProject as buildProject,
-  updateDocument as applyDocumentUpdate
+  updateDocument as applyDocumentUpdate,
+  updateProject as applyProjectUpdate
 } from "../core/projects.js";
 import type {
   CreateDocumentInput,
   CreateProjectInput,
-  UpdateDocumentInput
+  UpdateDocumentInput,
+  UpdateProjectInput
 } from "../core/projects.js";
 import {
   createDocumentVersion as buildVersion,
@@ -39,6 +41,38 @@ export class WorkspaceService {
     await this.storage.createProject(project);
     return project;
   }
+
+  async updateProject(
+  projectId: Id,
+  changes: UpdateProjectInput
+): Promise<Project> {
+  const current = await this.storage.getProject(projectId);
+
+  if (!current) {
+    throw new Error("No se puede actualizar un proyecto que no existe.");
+  }
+
+  const projects = applyProjectUpdate(
+    [current],
+    projectId,
+    changes,
+    this.now
+  );
+
+  const updated = projects[0];
+
+  if (!updated) {
+    throw new Error("No se pudo obtener el proyecto actualizado.");
+  }
+
+  if (updated === current) {
+    return current;
+  }
+
+  await this.storage.updateProject(updated);
+
+  return updated;
+}
 
   listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     return this.storage.listDocuments(projectId);

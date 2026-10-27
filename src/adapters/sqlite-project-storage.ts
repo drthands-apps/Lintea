@@ -23,6 +23,15 @@ export class SqliteProjectStorage implements ProjectStorage {
         updatedAt TEXT NOT NULL
       )
     `);
+    const projectColumns = await database.select<{ name: string }[]>(
+  "PRAGMA table_info(projects)"
+);
+
+if (!projectColumns.some((column) => column.name === "context")) {
+  await database.execute(
+    "ALTER TABLE projects ADD COLUMN context TEXT"
+  );
+}
 
     await database.execute(`
       CREATE TABLE IF NOT EXISTS documents (
@@ -56,25 +65,73 @@ export class SqliteProjectStorage implements ProjectStorage {
   }
 
   async listProjects(): Promise<Project[]> {
-    return this.database.select<Project[]>(
-      "SELECT id, title, createdAt, updatedAt FROM projects ORDER BY createdAt"
-    );
+    const rows = await this.database.select<
+  (Project & { context: string | null })[]
+>(
+  "SELECT id, title, createdAt, updatedAt, context FROM projects ORDER BY createdAt"
+);
+
+return rows.map(({ context, ...project }) => ({
+  ...project,
+  context: context ? JSON.parse(context) as Project["context"] : undefined
+}));
   }
 
   async getProject(projectId: Id): Promise<Project | null> {
-    const rows = await this.database.select<Project[]>(
-      "SELECT id, title, createdAt, updatedAt FROM projects WHERE id = ?",
-      [projectId]
-    );
-    return rows[0] ?? null;
+  const rows = await this.database.select<
+    (Project & { context: string | null })[]
+  >(
+    `SELECT id, title, createdAt, updatedAt, context
+     FROM projects WHERE id = ?`,
+    [projectId]
+  );
+
+  const row = rows[0];
+
+  if (!row) {
+    return null;
   }
 
+  const { context, ...project } = row;
+
+  return {
+    ...project,
+    context: context ? JSON.parse(context) as Project["context"] : undefined
+  };
+}
+
   async createProject(project: Project): Promise<void> {
-    await this.database.execute(
-      "INSERT INTO projects (id, title, createdAt, updatedAt) VALUES (?, ?, ?, ?)",
-      [project.id, project.title, project.createdAt, project.updatedAt]
-    );
+  await this.database.execute(
+    `INSERT INTO projects
+     (id, title, createdAt, updatedAt, context)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      project.id,
+      project.title,
+      project.createdAt,
+      project.updatedAt,
+      project.context ? JSON.stringify(project.context) : null
+    ]
+  );
+}
+
+async updateProject(project: Project): Promise<void> {
+  const result = await this.database.execute(
+    `UPDATE projects
+     SET title = ?, updatedAt = ?, context = ?
+     WHERE id = ?`,
+    [
+      project.title,
+      project.updatedAt,
+      project.context ? JSON.stringify(project.context) : null,
+      project.id
+    ]
+  );
+
+  if (result.rowsAffected === 0) {
+    throw new Error("No se puede actualizar un proyecto que no existe.");
   }
+}
 
   async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     return this.database.select<DocumentRecord[]>(
