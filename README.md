@@ -1,38 +1,47 @@
-# Lintea — núcleo técnico inicial
+# Lintea
 
-Esta carpeta contiene una primera prueba del núcleo de Lintea, no todavía la aplicación de escritorio ni la persistencia real en SQLite.
+Lintea es una aplicación de escritorio local para escribir y relacionar documentos, fragmentos, fichas, fuentes y notas. Está construida con React, TypeScript, Tauri y SQLite.
 
-## Qué demuestra
+## Funciones disponibles
 
-- Los documentos y fragmentos tienen identificadores estables.
-- Las relaciones apuntan a identificadores, no a títulos que pueden cambiar.
-- Un anclaje conserva el texto seleccionado y contexto cercano.
-- Si el texto seleccionado sigue siendo único, se puede localizar tras editar otras partes del documento.
-- Si el texto desaparece o aparece en varios lugares y no hay contexto suficiente, la función devuelve un resultado no resuelto en lugar de adivinar silenciosamente.
+- Proyectos y documentos con persistencia local en SQLite.
+- Capítulos compuestos por fragmentos independientes, con orden explícito y navegación entre ambos.
+- Fichas editables para personajes, lugares, acontecimientos, historias, conceptos y otros elementos.
+- Fuentes con metadatos, enlaces y citas asociables a documentos.
+- Notas del autor vinculadas a elementos del proyecto.
+- Etiquetas reutilizables para documentos, fichas, fuentes y notas.
+- Búsqueda local por texto y metadatos, con acceso directo a los resultados.
+- Historial manual de estados únicos, consulta y recuperación.
 
-## Requisitos
+La consulta de PDF y HTML se delega al navegador o a la aplicación externa correspondiente.
 
-Instala una versión LTS reciente de Node.js. npm viene incluido.
+## Desarrollo
 
-## Ejecutar las pruebas
-
-Abre una terminal en la carpeta que contiene `package.json` y ejecuta:
+Instala una versión LTS reciente de Node.js y las dependencias del proyecto:
 
 ```bash
 npm install
-npm test
-npm run typecheck
 ```
 
-Las pruebas no guardan datos en disco todavía. Validan reglas del núcleo en memoria.
+Para abrir la aplicación de escritorio con persistencia SQLite:
 
-## Archivos
+```bash
+npx tauri dev
+```
 
-- `src/core/model.ts`: tipos y creación de relaciones.
-- `src/core/anchors.ts`: anclajes de fragmentos y resolución tras una edición.
-- `tests/anchors.test.ts`: pruebas del comportamiento de los anclajes.
-- `tests/model.test.ts`: pruebas del modelo de relaciones.
+`npm run dev` inicia la interfaz web con almacenamiento en memoria; los cambios no persisten al cerrar esa sesión.
 
-## Importante
+## Comprobaciones disponibles
 
-Esta prueba usa un identificador sencillo generado con `crypto.randomUUID()`. En entornos donde no esté disponible, deberá inyectarse un generador de identificadores compatible. La siguiente etapa será validar el modelo, crear una capa de persistencia y guardar el proyecto en SQLite. No conectes aún datos importantes: esto es un prototipo.
+```bash
+npm run typecheck
+npm test
+```
+
+## Diseño y alcance
+
+- [Documento maestro de Lintea](docs/Lintea_Documento_Maestro_v0.1.md)
+- [Modelo de relaciones y composición](docs/Modelo_de_relaciones_y_composicion_v0.1.md)
+- [Formato LinteaZip](docs/Formato_LinteaZip_v0.1.md)
+
+LinteaZip está especificado, pero todavía no se implementan la importación ni la exportación del paquete. El historial actual guarda estados únicos completos; la comparación visual y el almacenamiento por cambios están pendientes.

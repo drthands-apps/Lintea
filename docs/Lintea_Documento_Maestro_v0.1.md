@@ -63,11 +63,15 @@ Accesibilidad: contemplar navegación por teclado, contraste, escalado de texto,
 
 Núcleo: proyectos, documentos, fragmentos identificables, notas, etiquetas, búsqueda, guardado fiable y recuperación.
 
+Estado actual del núcleo: proyectos y documentos se guardan en SQLite en la aplicación de escritorio; capítulos y fragmentos se componen mediante inclusiones ordenadas; fichas, fuentes y notas admiten relaciones y navegación; las etiquetas se comparten entre elementos y la búsqueda literal local consulta texto y metadatos. Las versiones permiten guardar estados únicos y recuperarlos. El almacenamiento por deltas, la comparación visual y la recuperación parcial siguen pendientes.
+
 Conocimiento relacionado: fichas de personajes, lugares, conceptos, acontecimientos, hechos, cronologías, fuentes, anotaciones, hipótesis, imágenes y vínculos tipados.
 
 Panel contextual: relaciones del fragmento activo, fuentes citadas, eventos temporales, notas asociadas y acceso a fichas relevantes.
 
-Biblioteca de referencia: materiales propios, referencias externas, metadatos bibliográficos, enlaces, citas y notas de lectura. Al principio puede guardar referencias y archivos locales.
+Biblioteca de referencia: materiales propios, referencias externas, metadatos bibliográficos, enlaces, citas y notas de lectura. Las fuentes pueden abrirse en el navegador o la aplicación externa correspondiente; Lintea no necesita incorporar un lector/editor PDF o HTML ni guardar una copia de cada obra consultada. Las citas, notas e imágenes que la persona quiera conservar sí forman parte del proyecto.
+
+Catálogos anexos: vistas editables y enlazadas de personajes, lugares, historias, conceptos y otras fichas; referencias bibliográficas y notas del autor tipo tarjeta. Cada dato tiene un registro fuente único. Las fichas admiten atributos apropiados a su tipo y enlaces externos. Desde ellas se navega a fragmentos y capítulos, distinguiendo vínculos directos de los heredados a través de un fragmento.
 
 Tablero de conexiones: tarjetas, relaciones visuales, filtros por tipo, varios tableros por proyecto y navegación hacia los elementos originales.
 
@@ -85,10 +89,14 @@ Herramientas externas: diccionarios, tesauros, correctores, catálogos bibliogr�
 
 Importación y exportación: formatos comunes para manuscritos (por ejemplo, Markdown, HTML, DOCX y ODT cuando sea viable) y exportación completa del proyecto, con relaciones, notas y recursos. Un manuscrito no equivale al proyecto completo.
 
+Formato portable LinteaZip: paquete `.ltz` basado en ZIP estándar, inspeccionable con herramientas comunes. Un manifiesto versionado identifica el proyecto y sus archivos; los índices JSON conservan IDs, relaciones, referencias y orden de composición. Los contenidos propios pueden usar formatos comunes como Markdown, HTML, XML, DOCX u ODT. Las fuentes externas se guardan como referencias con URL y localizador, sin exigir copias locales; los recursos opcionales que la persona decide incluir conservan su formato original.
+
 
 ## 6. Modelo conceptual de datos
 
-Entidades iniciales: Project, Document, Fragment, Entity, Source, Relation, Annotation, Event y Version. Se pueden ajustar, pero los identificadores estables son fundamentales.
+Entidades iniciales: Project, Document, Fragment, Entity, Source, Relation, Annotation, Event, CompositionEntry, Tag, TagAssignment y Version. Se pueden ajustar, pero los identificadores estables son fundamentales.
+
+La composición es explícita: capítulos ordenados y piezas con IDs estables. Incorporar un fragmento no crea una copia divergente ni destruye su origen. Las relaciones describen significado, menciones, citas y evidencia; no sustituyen el orden de composición.
 
 Cada objeto tiene un identificador independiente de su título o contenido. Las relaciones guardan origen, destino, tipo y metadatos. Ejemplos: «menciona», «participa en», «ocurre en», «sustentado por», «contradice» o «relacionado con».
 
@@ -175,6 +183,25 @@ Priorizar fiabilidad, relaciones duraderas, recuperación, exportación y privac
 Este documento es una guía viva. Las decisiones pueden cambiar cuando una prueba muestre una opción mejor, documentando motivo, coste de migración y efecto sobre los principios.
 
 Pendiente: nombre comercial definitivo y comprobación legal; licencia del repositorio; esquema detallado; formato de proyecto; integración SQLite/Tauri; formatos prioritarios; estrategia de respaldo; extensiones; proveedores de IA y política de privacidad específica.
+
+### Observaciones de interfaz para una próxima iteración
+
+- El panel contextual debe adaptar automáticamente qué secciones expande según la vista y el elemento activo: composición al trabajar con capítulos o fragmentos; fichas al consultar fichas; fuentes al consultar referencias. Los títulos permitirán expandir o contraer manualmente cualquier sección, sin impedir explorar el resto del contexto.
+- La navegación de composición debe ser simétrica y estar cerca del contenido: desde un capítulo se accede a sus fragmentos y, desde un fragmento, a los capítulos donde está incluido. Conviene mostrar los capítulos vinculados en un bloque inferior del fragmento, además de la sección de composición del panel contextual.
+- El acceso al panel contextual debe permanecer localizable al desplazarse por la interfaz. Revisar el diseño adaptable a distintos tamaños de ventana para evitar que el control desaparezca fuera de la zona visible.
+- Mantener la edición del manuscrito ligera y centrada en escribir: títulos y subtítulos, listas numeradas o con letras, negrita, cursiva e inserción de imágenes o tablas como herramientas básicas. La apariencia de la interfaz y la del texto podrán configurarse por separado mediante skins; no convertir la personalización en una larga lista de controles individuales.
+
+Estas notas expresan una dirección de diseño y deberán concretarse al abordar la siguiente iteración de interfaz, comprobando su comportamiento con el uso real.
+
+### Requisitos para la evolución del historial de versiones
+
+- El historial debe evitar registrar estados de contenido idénticos. La dirección deseada es guardar los cambios entre estados, al estilo de un historial de commits, en lugar de acumular copias completas redundantes. La implementación actual conserva estados únicos como instantáneas; el almacenamiento real por deltas queda pendiente y debe mantener la reconstrucción fiable de cualquier versión.
+- Permitir comparar dos estados lado a lado y recuperar de forma selectiva una idea o pasaje antiguo sin reemplazar el documento entero.
+- Permitir eliminar un punto de memoria con confirmación y una advertencia clara sobre lo que se borrará. Si el almacenamiento por deltas hace que otros estados dependan de ese punto, conservar la integridad del historial al eliminarlo y explicar las consecuencias antes de confirmar.
+
+### Granularidad de etiquetas y relaciones
+
+Una etiqueta aplicada a un capítulo completo puede ser demasiado amplia en manuscritos largos. Las relaciones deben poder localizar pasajes concretos y explicar su sentido con una cita contextual y una nota opcional del autor. Las etiquetas clasifican temas transversales; no sustituyen relaciones tipadas ni notas explicativas. La localización debe sobrevivir a ediciones mediante fragmentos con identidad propia o anclajes recuperables, no posiciones de caracteres rígidas.
 
 Antes de añadir una función, preguntar: ¿ayuda a escribir, recordar, relacionar, comprobar o exportar? ¿Puede funcionar localmente? ¿Respeta el control del autor? ¿Se puede probar? ¿Añade dependencia o coste? ¿Conviene integrar una herramienta existente?
 

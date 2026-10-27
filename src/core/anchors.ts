@@ -44,7 +44,7 @@ export function createFragmentAnchor(
  * is required rather than silently attaching the relation to the wrong text.
  */
 export function resolveFragmentAnchor(
-  anchor: FragmentAnchor,
+  anchor: Pick<FragmentAnchor, "documentId" | "quote" | "prefix" | "suffix">,
   currentText: string
 ): AnchorResolution {
   const candidates: number[] = [];

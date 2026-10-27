@@ -10,6 +10,7 @@ export type EntityKind =
   | "character"
   | "place"
   | "event"
+  | "story"
   | "concept"
   | "person"
   | "organization"
@@ -23,6 +24,8 @@ export type RelationKind =
   | "contradicts"
   | "related_to"
   | "inspired_by";
+
+export type DocumentKind = "chapter" | "fragment" | "note";
 
 export type ProjectKind =
   | "fiction"
@@ -58,6 +61,10 @@ export interface DocumentRecord {
   text: string;
   createdAt: string;
   updatedAt: string;
+  /** Roles are optional for compatibility with projects created before this field existed. */
+  kind?: DocumentKind;
+  /** Explicit manuscript order; independent from creation and edit dates. */
+  order?: number;
 }
 
 export interface FragmentAnchor {
@@ -78,6 +85,33 @@ export interface KnowledgeEntity {
   kind: EntityKind;
   title: string;
   description?: string;
+  details?: EntityDetail[];
+  externalLinks?: ExternalLink[];
+  order?: number;
+}
+
+export interface EntityDetail {
+  label: string;
+  value: string;
+}
+
+export interface ExternalLink {
+  label: string;
+  url: string;
+}
+
+export type AuthorNoteColor = "sage" | "sand" | "rose" | "sky";
+
+export interface AuthorNote {
+  id: Id;
+  projectId: Id;
+  content: string;
+  color: AuthorNoteColor;
+  targetType?: RelationTargetType;
+  targetId?: Id;
+  createdAt: string;
+  updatedAt: string;
+  order?: number;
 }
 
 export interface SourceRecord {
@@ -87,9 +121,13 @@ export interface SourceRecord {
   author?: string;
   url?: string;
   citation?: string;
+  publisher?: string;
+  year?: string;
+  doi?: string;
+  order?: number;
 }
 
-export type RelationTargetType = "fragment" | "entity" | "source" | "event";
+export type RelationTargetType = "document" | "fragment" | "entity" | "source" | "event";
 
 export interface Relation {
   id: Id;
@@ -101,6 +139,34 @@ export interface Relation {
   kind: RelationKind;
   createdAt: string;
   note?: string;
+  anchor?: Pick<FragmentAnchor, "documentId" | "quote" | "prefix" | "suffix">;
+}
+
+/** A stable reference to a fragment included in a chapter's composition. */
+export interface CompositionEntry {
+  id: Id;
+  projectId: Id;
+  chapterId: Id;
+  fragmentId: Id;
+  order: number;
+  createdAt: string;
+}
+
+export type TagTargetType = "document" | "entity" | "source" | "author_note";
+
+export interface Tag {
+  id: Id;
+  projectId: Id;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+}
+
+export interface TagAssignment {
+  projectId: Id;
+  tagId: Id;
+  targetType: TagTargetType;
+  targetId: Id;
 }
 
 export function createId(): Id {

@@ -1,6 +1,7 @@
 
 import type {
   DocumentRecord,
+  DocumentKind,
   Id,
   Project,
   ProjectContext
@@ -15,6 +16,8 @@ export interface CreateDocumentInput {
   projectId: Id;
   title: string;
   text?: string;
+  kind?: DocumentKind;
+  order?: number;
 }
 
 export interface ProjectWorkspace {
@@ -164,6 +167,8 @@ export function createDocument(
     projectId: input.projectId,
     title,
     text: input.text ?? "",
+    kind: input.kind ?? "note",
+    order: input.order ?? 0,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -192,6 +197,8 @@ export function addDocument(
 export interface UpdateDocumentInput {
   title?: string;
   text?: string;
+  kind?: DocumentKind;
+  order?: number;
 }
 
 export function updateDocument(
@@ -216,8 +223,10 @@ export function updateDocument(
       : requireText(changes.title, "El título del documento");
 
   const text = changes.text === undefined ? current.text : changes.text;
+  const kind = changes.kind === undefined ? current.kind ?? "note" : changes.kind;
+  const order = changes.order === undefined ? current.order ?? 0 : changes.order;
 
-  if (title === current.title && text === current.text) {
+  if (title === current.title && text === current.text && kind === (current.kind ?? "note") && order === (current.order ?? 0)) {
     return workspace;
   }
 
@@ -227,6 +236,8 @@ export function updateDocument(
     ...current,
     title,
     text,
+    kind,
+    order,
     updatedAt
   };
 

@@ -1,0 +1,85 @@
+# Lintea: relaciones y composición de la obra
+
+Documento de decisión para orientar la siguiente etapa del prototipo.
+
+El paquete portable del proyecto se especifica en [Formato LinteaZip 0.1](Formato_LinteaZip_v0.1.md).
+
+## Idea central
+
+Lintea trabaja con materiales que mantienen identidad propia y pueden conectarse o componerse de distintas maneras. El sistema debe separar dos operaciones que conviven en el mismo proyecto:
+
+- **Relacionar:** expresar cómo se conectan un texto, un fragmento, una ficha o una fuente.
+- **Componer:** decidir qué fragmentos forman parte de un capítulo y en qué orden aparecen los capítulos.
+
+Una relación no cambia por sí misma la ubicación ni el texto de sus elementos. La composición tampoco debe borrar la procedencia de un fragmento.
+
+## Elementos del proyecto
+
+- **Documento:** unidad de escritura que puede ser capítulo, nota o fragmento independiente.
+- **Fragmento:** pieza breve con identidad estable. Puede nacer como material suelto y luego incorporarse a uno o varios capítulos.
+- **Ficha:** personaje, lugar, acontecimiento, concepto, persona u organización con información descriptiva.
+- **Fuente:** referencia bibliográfica o material consultado, con autoría, enlace y cita.
+- **Relación:** vínculo tipado entre elementos; por ejemplo, menciona, participa en, sucede en, está sustentado por, contradice, se inspira en o forma parte de.
+- **Composición:** lista ordenada de fragmentos que forman un capítulo. El orden de capítulos pertenece a la estructura del manuscrito, no a sus fechas de creación.
+
+Los identificadores se mantienen aunque cambien los títulos o la posición. Los anclajes a pasajes concretos guardan cita y contexto; si no se pueden resolver con confianza, requieren revisión manual.
+
+## Granularidad y sentido de los vínculos
+
+Un vínculo a un capítulo completo puede resultar demasiado amplio, sobre todo cuando el manuscrito crece. Cuando la relación se refiera a una parte concreta, debe poder señalar un pasaje y regresar directamente a él; el vínculo debe mostrar una cita o extracto contextual, su tipo y, cuando haga falta, una nota del autor que explique por qué importa. Una ficha o fuente conectada únicamente al capítulo no debe sugerir que todo el capítulo trata de ella.
+
+Las etiquetas sirven para agrupar temas o estados que atraviesan distintos tipos de elementos. Por sí solas no explican qué relación existe. Para encontrar una referencia útil dentro de un documento largo, el resultado debe poder indicar el pasaje, mediante un fragmento independiente o un anclaje estable a texto seleccionado. La aplicación futura de etiquetas a pasajes debe reutilizar esa misma localización estable; no debe guardar solamente índices de caracteres que se vuelvan incorrectos al editar.
+
+Regla de diseño: separar la clasificación amplia (etiqueta), el vínculo semántico (relación tipada), la explicación del autor (nota de relación) y la localización precisa (anclaje o fragmento). La interfaz debe presentar esas cuatro piezas juntas cuando aporten contexto, sin obligar a rellenarlas todas para cada vínculo.
+
+En el prototipo, las etiquetas todavía se aplican al elemento completo. Los vínculos de fichas y fuentes pueden guardar una selección de texto, volver a ella y conservar una nota explicativa editable; la nota también aparece en los usos listados desde el catálogo. Si el anclaje no se resuelve con confianza tras editar, Lintea abre el documento y pide revisar el pasaje en vez de elegir otro automáticamente. La asignación de etiquetas a pasajes queda pendiente.
+
+## Primer recorrido de uso
+
+1. Crear un fragmento independiente sin decidir todavía su capítulo.
+2. Relacionarlo con una ficha y, cuando corresponda, con una fuente.
+3. Crear o elegir un capítulo e incorporar el fragmento como una pieza con identidad propia.
+4. Reordenar los capítulos explícitamente.
+5. Volver desde el capítulo al fragmento original y consultar sus relaciones.
+
+La interfaz presenta estos elementos de forma contextual y plegable para mantener el texto como centro de la escritura.
+
+## Vistas anexas y navegación de vuelta
+
+El anexo de personajes, lugares, historias y otras fichas es un catálogo/vista de los registros del proyecto, no un segundo documento con datos copiados. Cada ficha se edita en un único lugar y admite secciones flexibles según su clase: por ejemplo, personalidad, aspecto, motivaciones e historia para un personaje; localización, rasgos y referencias para un lugar. Así pueden añadirse campos útiles sin forzar una plantilla rígida.
+
+Las fichas admiten enlaces externos etiquetados (por ejemplo, Wikipedia, mapas o páginas web) y relaciones internas. Desde una ficha se consultan los fragmentos donde aparece y los capítulos relacionados. La interfaz distingue vínculos directos con un capítulo de los capítulos alcanzados a través de un fragmento incluido, y evita duplicarlos en la lista.
+
+Las fuentes forman otro catálogo anexado al proyecto. Cada registro puede reunir metadatos bibliográficos, DOI/URL, cita o localizador. Los materiales consultados se abren con el navegador o la aplicación externa correspondiente; Lintea no asume la lectura ni la edición interna de PDF o HTML. Guardar una copia dentro del proyecto es opcional. El texto citado puede anclarse a un pasaje; el fragmento y la fuente siguen siendo registros independientes.
+
+Las notas del autor son tarjetas breves tipo sticker, opcionalmente vinculadas al proyecto, documento, fragmento, ficha o fuente. Deben poder consultarse desde el elemento relacionado y desde el espacio de notas del proyecto. Su contenido no se mezcla con el manuscrito salvo que la persona lo incorpore expresamente.
+
+## Etiquetas y búsqueda
+
+Las etiquetas son registros reutilizables del proyecto, con identificadores propios. Una etiqueta puede aplicarse a varios documentos, fichas, fuentes o notas; cambiar su nombre conserva todas las asignaciones. El mismo nombre normalizado no se duplica dentro del proyecto. Eliminar una etiqueta retira sus asignaciones, pero nunca elimina los elementos etiquetados.
+
+La búsqueda inicial es literal y local. Recorre títulos y contenido de documentos, campos de fichas, metadatos de fuentes, texto de notas y nombres de etiquetas. Los términos se comparan sin distinguir mayúsculas ni acentos; todos los términos escritos deben aparecer en el resultado. Los resultados priorizan coincidencias en el título y permiten abrir el registro original. El índice de búsqueda se reconstruye al cambiar los datos del proyecto y se reutiliza mientras se escribe la consulta.
+
+Un fragmento indica siempre si no está incluido en ningún capítulo o enumera todos sus capítulos. La inclusión es una relación de composición reversible y no impide que la misma pieza aparezca en varios lugares.
+
+## Organización y reasignación
+
+Las listas y bloques de las vistas anexas deben poder plegarse y reordenarse a voluntad. El orden debe conservarse en el proyecto y no depender de fechas, títulos ni del orden en que se crearon los registros.
+
+Fichas, fuentes y notas pueden reasignarse a otros fragmentos o capítulos. Cambiar una asociación edita el vínculo; no crea una copia del elemento ni borra su historial. Las inclusiones de fragmentos en capítulos se pueden añadir, quitar y reordenar independientemente. La interfaz debe mostrar los usos directos y los heredados para que la reasignación sea comprensible.
+
+## Reglas de integridad
+
+- Incorporar un fragmento no elimina ni duplica su registro original.
+- La misma pieza puede aparecer en más de un capítulo; cada inclusión tiene su propio orden dentro del capítulo.
+- Reordenar capítulos o piezas no modifica fechas, identificadores ni relaciones.
+- Las citas distinguen la fuente de la afirmación o fragmento que respaldan.
+- Ninguna relación se mueve silenciosamente si un anclaje deja de ser fiable.
+- Las operaciones de composición deben poder deshacerse o recuperarse mediante el historial.
+
+## Alcance gradual
+
+La primera entrega debe cubrir el recorrido de extremo a extremo con fragmentos, capítulos, fichas y fuentes, relaciones guardadas localmente y orden explícito. La comparación visual de versiones, las líneas temporales complejas, los tableros y la personalización por skins quedan fuera de este primer corte.
+
+El almacenamiento activo de escritorio sigue en SQLite. La exportación/importación LinteaZip debe poder reconstruir los elementos, relaciones, composición y versiones con sus IDs, sin copiar el texto de un fragmento al incorporarlo a un capítulo.
+
