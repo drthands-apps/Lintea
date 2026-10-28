@@ -44,4 +44,4 @@ npm test
 - [Modelo de relaciones y composición](docs/Modelo_de_relaciones_y_composicion_v0.1.md)
 - [Formato LinteaZip](docs/Formato_LinteaZip_v0.1.md)
 
-LinteaZip está especificado, pero todavía no se implementan la importación ni la exportación del paquete. El historial actual guarda estados únicos completos; la comparación visual y el almacenamiento por cambios están pendientes.
+LinteaZip cuenta con una propuesta preliminar; la importación y exportación aún no están implementadas y el formato exhaustivo se concretará tras completar el modelo de relaciones y decidir cómo representar los cambios colaborativos. El historial actual guarda estados únicos completos; la comparación visual y el almacenamiento por cambios están pendientes.

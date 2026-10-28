@@ -2,23 +2,12 @@
 import { describe, expect, it } from "vitest";
 import { MemoryProjectStorage } from "../src/core/memory-storage.js";
 import { WorkspaceService } from "../src/application/workspace-service.js";
+import { createTestService } from "./helpers.js";
 
 describe("WorkspaceService", () => {
-  function createService() {
-    let tick = 0;
-
-    const now = () => new Date(
-      Date.UTC(2026, 0, 1, 0, 0, tick++)
-    );
-
-    const storage = new MemoryProjectStorage();
-    const service = new WorkspaceService(storage, now);
-
-    return { storage, service };
-  }
 
   it("crea un proyecto y permite recuperarlo", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({
       title: "Mi proyecto"
@@ -32,7 +21,7 @@ describe("WorkspaceService", () => {
   });
 
   it("actualiza el contexto de un proyecto y conserva su fecha de creación", async () => {
-  const { service } = createService();
+  const { service } = createTestService();
 
   const project = await service.createProject({
     title: "Mi proyecto"
@@ -61,7 +50,7 @@ describe("WorkspaceService", () => {
 });
 
 it("no cambia las fechas si el proyecto no se modifica", async () => {
-  const { service } = createService();
+  const { service } = createTestService();
 
   const project = await service.createProject({
     title: "Mi proyecto"
@@ -79,7 +68,7 @@ it("no cambia las fechas si el proyecto no se modifica", async () => {
 });
 
 it("actualiza el título y conserva las fechas correctamente", async () => {
-  const { service } = createService();
+  const { service } = createTestService();
 
   const project = await service.createProject({
     title: "Mi proyecto"
@@ -99,7 +88,7 @@ it("actualiza el título y conserva las fechas correctamente", async () => {
 
 
 it("rechaza actualizar un proyecto inexistente", async () => {
-  const { service } = createService();
+  const { service } = createTestService();
 
   await expect(
   service.updateProject("proyecto-inexistente", {
@@ -112,7 +101,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
 
 
   it("crea un documento dentro de un proyecto existente", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({
       title: "Mi proyecto"
@@ -133,7 +122,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("rechaza crear un documento en un proyecto inexistente", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     await expect(
       service.createDocument({
@@ -146,7 +135,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("actualiza el título y el contenido de un documento", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({
       title: "Mi proyecto"
@@ -173,7 +162,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("rechaza actualizar un documento inexistente", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     await expect(
       service.updateDocument("documento-inexistente", {
@@ -185,7 +174,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("no cambia la fecha si no hay modificaciones", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({
       title: "Mi proyecto"
@@ -206,7 +195,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
   
   it("guarda y consulta versiones de un documento", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({ title: "Mi proyecto" });
     const document = await service.createDocument({
@@ -228,7 +217,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("evita versiones automáticas duplicadas del mismo contenido", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({ title: "Mi proyecto" });
     const document = await service.createDocument({
@@ -245,7 +234,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("conserva el estado actual antes de recuperar una versión antigua", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({ title: "Mi proyecto" });
     const document = await service.createDocument({
@@ -282,7 +271,7 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   });
 
   it("rechaza recuperar una versión de otro documento", async () => {
-    const { service } = createService();
+    const { service } = createTestService();
 
     const project = await service.createProject({ title: "Mi proyecto" });
     const first = await service.createDocument({
@@ -304,5 +293,86 @@ it("rechaza actualizar un proyecto inexistente", async () => {
       "La versión solicitada no pertenece a este documento."
     );
   });
+  it("no registra una tercera versión si el contenido vuelve a un estado anterior", async () => {
+  const { service } = createTestService();
+  const project = await service.createProject({ title: "P" });
+  const document = await service.createDocument({
+    projectId: project.id, title: "Borrador", text: "Estado A."
+  });
+  const first = await service.saveDocumentVersion(document.id);
 
+  await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+  await service.saveDocumentVersion(document.id);
+
+  await service.updateDocument(document.id, { title: "Borrador", text: "Estado A." });
+  const back = await service.saveDocumentVersion(document.id);
+
+  expect(back.id).toBe(first.id);
+  expect(await service.listDocumentVersions(document.id)).toHaveLength(2);
+  });
+  it("no registra una tercera versión si el contenido vuelve a un estado anterior", async () => {
+    const { service } = createTestService();
+    const project = await service.createProject({ title: "P" });
+    const document = await service.createDocument({
+      projectId: project.id, title: "Borrador", text: "Estado A."
+    });
+    const first = await service.saveDocumentVersion(document.id);
+
+    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.saveDocumentVersion(document.id);
+
+    await service.updateDocument(document.id, { title: "Borrador", text: "Estado A." });
+    const back = await service.saveDocumentVersion(document.id);
+
+    expect(back.id).toBe(first.id);
+    expect(await service.listDocumentVersions(document.id)).toHaveLength(2);
+  });
+  it("rechaza URLs no válidas al crear una fuente", async () => {
+    const { service } = createTestService();
+    const project = await service.createProject({ title: "P" });
+    await expect(
+      service.createSource({ projectId: project.id, title: "S", url: "javascript:alert(1)" })
+    ).rejects.toThrow("Los enlaces externos deben usar HTTP o HTTPS.");
+    await expect(
+      service.createSource({ projectId: project.id, title: "S", url: "no-es-url" })
+    ).rejects.toThrow("La dirección de la fuente no es válida.");
+  });
+  it("restaurar una versión antigua no elimina relaciones nuevas del proyecto", async () => {
+  const { service } = createTestService();
+  const project = await service.createProject({ title: "P" });
+  const document = await service.createDocument({
+    projectId: project.id, title: "Borrador", text: "Estado A."
+  });
+  const entityOld = await service.createKnowledgeEntity({
+    projectId: project.id, kind: "concept", title: "Vieja"
+  });
+  const relationOld = await service.createRelation({
+    projectId: project.id,
+    fromId: document.id, fromType: "document",
+    toId: entityOld.id, toType: "entity",
+    kind: "mentions"
+  });
+
+  // Guardamos la versión con la relación antigua activa.
+  const version = await service.saveDocumentVersion(document.id, { label: "Con relación antigua" });
+
+  // Después, el usuario añade una relación nueva al documento.
+  const entityNew = await service.createKnowledgeEntity({
+    projectId: project.id, kind: "concept", title: "Nueva"
+  });
+  const relationNew = await service.createRelation({
+    projectId: project.id,
+    fromId: document.id, fromType: "document",
+    toId: entityNew.id, toType: "entity",
+    kind: "mentions"
+  });
+
+  // Restaurar la versión antigua no debe eliminar la relación nueva.
+  await service.restoreDocumentVersion(document.id, version.id);
+
+  const relations = await service.listRelations(project.id);
+  expect(relations.map((r) => r.id).sort()).toEqual(
+    [relationOld.id, relationNew.id].sort()
+  );
+});
 });

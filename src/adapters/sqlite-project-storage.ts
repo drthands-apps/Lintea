@@ -135,6 +135,12 @@ if (!projectColumns.some((column) => column.name === "context")) {
       FOREIGN KEY (projectId) REFERENCES projects(id),
       FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
     await database.execute("CREATE INDEX IF NOT EXISTS idx_tag_assignments_target ON tag_assignments (projectId, targetType, targetId)");
+    await database.execute(`CREATE TABLE IF NOT EXISTS passage_tag_assignments (
+      projectId TEXT NOT NULL, tagId TEXT NOT NULL, targetId TEXT NOT NULL,
+      documentId TEXT NOT NULL, quote TEXT NOT NULL, prefix TEXT NOT NULL, suffix TEXT NOT NULL,
+      PRIMARY KEY (projectId, tagId, targetId, documentId, quote, prefix, suffix),
+      FOREIGN KEY (projectId) REFERENCES projects(id),
+      FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
 
     return new SqliteProjectStorage(database);
   }
@@ -487,18 +493,33 @@ async updateProject(project: Project): Promise<void> {
   }
 
   async deleteTag(projectId: Id, tagId: Id): Promise<void> {
+    await this.database.execute("DELETE FROM passage_tag_assignments WHERE projectId = ? AND tagId = ?", [projectId, tagId]);
     await this.database.execute("DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ?", [projectId, tagId]);
     await this.database.execute("DELETE FROM project_tags WHERE projectId = ? AND id = ?", [projectId, tagId]);
   }
 
-  listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
-    return this.database.select<TagAssignment[]>(
+  async listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
+    const documentAssignments = await this.database.select<TagAssignment[]>(
       "SELECT projectId, tagId, targetType, targetId FROM tag_assignments WHERE projectId = ?",
       [projectId]
     );
+    const passageAssignments = await this.database.select<Array<TagAssignment & { documentId: Id; quote: string; prefix: string; suffix: string }>>(
+      "SELECT projectId, tagId, 'document' AS targetType, targetId, documentId, quote, prefix, suffix FROM passage_tag_assignments WHERE projectId = ?",
+      [projectId]
+    );
+    return [...documentAssignments, ...passageAssignments.map(({ documentId, quote, prefix, suffix, ...assignment }) => ({
+      ...assignment, anchor: { documentId, quote, prefix, suffix }
+    }))];
   }
 
   async assignTag(assignment: TagAssignment): Promise<void> {
+    if (assignment.anchor) {
+      await this.database.execute(
+        "INSERT OR IGNORE INTO passage_tag_assignments (projectId, tagId, targetId, documentId, quote, prefix, suffix) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [assignment.projectId, assignment.tagId, assignment.targetId, assignment.anchor.documentId, assignment.anchor.quote, assignment.anchor.prefix, assignment.anchor.suffix]
+      );
+      return;
+    }
     await this.database.execute(
       "INSERT OR IGNORE INTO tag_assignments (projectId, tagId, targetType, targetId) VALUES (?, ?, ?, ?)",
       [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]
@@ -506,6 +527,13 @@ async updateProject(project: Project): Promise<void> {
   }
 
   async unassignTag(assignment: TagAssignment): Promise<void> {
+    if (assignment.anchor) {
+      await this.database.execute(
+        "DELETE FROM passage_tag_assignments WHERE projectId = ? AND tagId = ? AND targetId = ? AND documentId = ? AND quote = ? AND prefix = ? AND suffix = ?",
+        [assignment.projectId, assignment.tagId, assignment.targetId, assignment.anchor.documentId, assignment.anchor.quote, assignment.anchor.prefix, assignment.anchor.suffix]
+      );
+      return;
+    }
     await this.database.execute(
       "DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ? AND targetType = ? AND targetId = ?",
       [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]

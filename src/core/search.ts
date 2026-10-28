@@ -5,7 +5,8 @@ import type {
   SourceRecord,
   Tag,
   TagAssignment,
-  TagTargetType
+  TagTargetType,
+  FragmentAnchor
 } from "./model.js";
 
 export type SearchItemType = TagTargetType;
@@ -17,6 +18,7 @@ export interface SearchResult {
   excerpt: string;
   tags: string[];
   score: number;
+  anchor?: Pick<FragmentAnchor, "documentId" | "quote" | "prefix" | "suffix">;
 }
 
 export interface SearchInput {
@@ -30,7 +32,12 @@ export interface SearchInput {
 }
 
 export interface SearchIndex {
-  entries: Array<SearchResult & { normalizedTitle: string; normalizedContent: string; normalizedTags: string }>;
+  entries: Array<Omit<SearchResult, "anchor"> & {
+    normalizedTitle: string;
+    normalizedContent: string;
+    normalizedTags: string;
+    passageTags: Array<{ tag: string; anchor: NonNullable<TagAssignment["anchor"]> }>;
+  }>;
 }
 
 function fold(value: string): string {
@@ -48,12 +55,18 @@ function excerptFor(text: string, term: string): string {
 
 export function buildProjectSearchIndex(input: Omit<SearchInput, "query">): SearchIndex {
   const tagsByTarget = new Map<string, string[]>();
+  const passageTagsByTarget = new Map<string, Array<{ tag: string; anchor: NonNullable<TagAssignment["anchor"]> }>>();
   const tagsById = new Map(input.tags.map((tag) => [tag.id, tag]));
   for (const assignment of input.assignments) {
     const tag = tagsById.get(assignment.tagId);
     if (!tag) continue;
     const key = `${assignment.targetType}:${assignment.targetId}`;
     tagsByTarget.set(key, [...(tagsByTarget.get(key) ?? []), tag.name]);
+    if (assignment.anchor) {
+      const passageTags = passageTagsByTarget.get(key) ?? [];
+      const duplicate = passageTags.some((item) => item.tag === tag.name && item.anchor.documentId === assignment.anchor!.documentId && item.anchor.quote === assignment.anchor!.quote && item.anchor.prefix === assignment.anchor!.prefix && item.anchor.suffix === assignment.anchor!.suffix);
+      if (!duplicate) passageTagsByTarget.set(key, [...passageTags, { tag: tag.name, anchor: assignment.anchor }]);
+    }
   }
 
   const candidates: Array<{ id: string; type: SearchItemType; title: string; text: string }> = [
@@ -83,7 +96,8 @@ export function buildProjectSearchIndex(input: Omit<SearchInput, "query">): Sear
       score: 0,
       normalizedTitle,
       normalizedContent,
-      normalizedTags
+      normalizedTags,
+      passageTags: passageTagsByTarget.get(`${item.type}:${item.id}`) ?? []
     };
   });
   return { entries };
@@ -97,6 +111,23 @@ export function searchIndexedProject(index: SearchIndex, query: string): SearchR
     if (!terms.every((term) => content.includes(term))) return [];
     const score = terms.reduce((total, term) => total + (title.includes(term) ? 4 : tagsText.includes(term) ? 3 : 1), 0);
     const matchedTerm = terms.find((term) => fold(item.excerpt).includes(term)) ?? terms[0]!;
+    const base = fold(`${item.title} ${item.excerpt}`);
+    const anchoredMatches = item.passageTags.filter((passage) => {
+      const passageTag = fold(passage.tag);
+      return terms.some((term) => passageTag.includes(term)) &&
+        terms.every((term) => base.includes(term) || passageTag.includes(term));
+    });
+    if (anchoredMatches.length) {
+      return anchoredMatches.map((passage) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        excerpt: `«${passage.anchor.quote}»`,
+        tags: [passage.tag],
+        score: score + 1,
+        anchor: passage.anchor
+      }));
+    }
     return [{ id: item.id, type: item.type, title: item.title, excerpt: excerptFor(item.excerpt || item.title, matchedTerm), tags: item.tags, score }];
   }).sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, "es"));
 }

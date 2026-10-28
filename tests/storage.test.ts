@@ -103,5 +103,21 @@ describe("MemoryProjectStorage", () => {
 
     expect(await storage.getDocument(document.id)).toEqual(updated);
   });
+  it("rechaza reordenar con un ID que no pertenece al capítulo", async () => {
+  const storage = new MemoryProjectStorage();
+  const project = { id: "p", title: "P", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" };
+  await storage.createProject(project);
+  const chapterA = { id: "a", projectId: "p", title: "A", text: "", kind: "chapter" as const, order: 0, createdAt: project.createdAt, updatedAt: project.updatedAt };
+  const chapterB = { id: "b", projectId: "p", title: "B", text: "", kind: "chapter" as const, order: 1, createdAt: project.createdAt, updatedAt: project.updatedAt };
+  const fragment = { id: "f", projectId: "p", title: "F", text: "", kind: "fragment" as const, order: 0, createdAt: project.createdAt, updatedAt: project.updatedAt };
+  await storage.createDocument(chapterA);
+  await storage.createDocument(chapterB);
+  await storage.createDocument(fragment);
+  await storage.createCompositionEntry({ id: "e1", projectId: "p", chapterId: "a", fragmentId: "f", order: 0, createdAt: project.createdAt });
+  await expect(
+    storage.reorderCompositionEntries("a", ["e1", "id-ajeno"])
+  ).rejects.toThrow("El nuevo orden debe incluir cada pieza del capítulo exactamente una vez.");
+});
+
 });
 

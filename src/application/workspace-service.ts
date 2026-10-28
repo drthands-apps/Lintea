@@ -180,6 +180,30 @@ export class WorkspaceService {
       })).filter((detail) => detail.label || detail.value),
       externalLinks
     };
+
+    // Event fichas used to be stored as a distinct relation endpoint type.
+    // Normalize those legacy edges to the canonical "entity" endpoint so
+    // changing a ficha's kind cannot leave its relations or notes dangling.
+    const [relations, notes] = await Promise.all([
+      this.storage.listRelations(entity.projectId),
+      this.storage.listAuthorNotes(entity.projectId)
+    ]);
+    for (const relation of relations) {
+      const fromIsLegacyEvent = relation.fromType === "event" && relation.fromId === entity.id;
+      const toIsLegacyEvent = relation.toType === "event" && relation.toId === entity.id;
+      if (fromIsLegacyEvent || toIsLegacyEvent) {
+        await this.storage.updateRelation({
+          ...relation,
+          fromType: fromIsLegacyEvent ? "entity" : relation.fromType,
+          toType: toIsLegacyEvent ? "entity" : relation.toType
+        });
+      }
+    }
+    for (const note of notes) {
+      if (note.targetId === entity.id && note.targetType === "event") {
+        await this.updateAuthorNote({ ...note, targetType: "entity" });
+      }
+    }
     await this.storage.updateKnowledgeEntity(updated);
     return updated;
   }
@@ -193,7 +217,7 @@ export class WorkspaceService {
     const source: SourceRecord = {
       id: createId(), projectId: input.projectId, title,
       author: input.author?.trim() || undefined,
-      url: input.url?.trim() || undefined,
+      url: this.normalizeSourceUrl(input.url),
       citation: input.citation?.trim() || undefined,
       publisher: input.publisher?.trim() || undefined,
       year: input.year?.trim() || undefined,
@@ -221,14 +245,7 @@ export class WorkspaceService {
     if (!(await this.storage.listSources(source.projectId)).some((item) => item.id === source.id)) {
       throw new Error("No se puede actualizar una fuente que no existe en este proyecto.");
     }
-    const url = source.url?.trim() || undefined;
-    if (url) {
-      let parsed: URL;
-      try { parsed = new URL(url); } catch { throw new Error("La dirección de la fuente no es válida."); }
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        throw new Error("Los enlaces externos deben usar HTTP o HTTPS.");
-      }
-    }
+    const url = this.normalizeSourceUrl(source.url);
     const updated: SourceRecord = {
       ...source, title, url, author: source.author?.trim() || undefined,
       citation: source.citation?.trim() || undefined,
@@ -273,7 +290,12 @@ export class WorkspaceService {
         throw new Error("El pasaje anclado debe pertenecer a uno de los documentos de la relación.");
       }
     }
-    const relation = createRelation({ ...input, note: input.note?.trim() || undefined }, this.now);
+    const relation = createRelation({
+      ...input,
+      fromType: input.fromType === "event" ? "entity" : input.fromType,
+      toType: input.toType === "event" ? "entity" : input.toType,
+      note: input.note?.trim() || undefined
+    }, this.now);
     await this.storage.createRelation(relation);
     return relation;
   }
@@ -505,6 +527,9 @@ export class WorkspaceService {
   }
 
   async setTagAssignment(input: TagAssignment, assigned: boolean): Promise<void> {
+    if (input.anchor && (input.targetType !== "document" || input.anchor.documentId !== input.targetId || !input.anchor.quote.trim())) {
+      throw new Error("El pasaje etiquetado debe pertenecer al documento seleccionado.");
+    }
     const tag = (await this.storage.listTags(input.projectId)).find((item) => item.id === input.tagId);
     if (!tag) throw new Error("La etiqueta no pertenece a este proyecto.");
     let targetExists = false;
@@ -521,4 +546,18 @@ export class WorkspaceService {
     if (assigned) await this.storage.assignTag(input);
     else await this.storage.unassignTag(input);
   }
+    private normalizeSourceUrl(url: string | undefined): string | undefined {
+  const trimmed = url?.trim() || undefined;
+  if (!trimmed) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("La dirección de la fuente no es válida.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Los enlaces externos deben usar HTTP o HTTPS.");
+  }
+  return trimmed;
+}
 }

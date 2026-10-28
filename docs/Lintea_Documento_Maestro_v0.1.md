@@ -63,13 +63,19 @@ Accesibilidad: contemplar navegación por teclado, contraste, escalado de texto,
 
 Núcleo: proyectos, documentos, fragmentos identificables, notas, etiquetas, búsqueda, guardado fiable y recuperación.
 
-Estado actual del núcleo: proyectos y documentos se guardan en SQLite en la aplicación de escritorio; capítulos y fragmentos se componen mediante inclusiones ordenadas; fichas, fuentes y notas admiten relaciones y navegación; las etiquetas se comparten entre elementos y la búsqueda literal local consulta texto y metadatos. Las versiones permiten guardar estados únicos y recuperarlos. El almacenamiento por deltas, la comparación visual y la recuperación parcial siguen pendientes.
+Estado actual del núcleo: proyectos y documentos se guardan en SQLite en la aplicación de escritorio; capítulos y fragmentos se componen mediante inclusiones ordenadas; fichas, fuentes y notas admiten relaciones y navegación; las etiquetas pueden asignarse a elementos completos o a pasajes seleccionados con anclajes de cita y contexto, y la búsqueda puede abrir el pasaje etiquetado cuando localiza su cita con seguridad. Las etiquetas siguen siendo independientes de las versiones del documento. Las versiones permiten guardar estados únicos y recuperarlos. El almacenamiento por deltas, la comparación visual y la recuperación parcial siguen pendientes.
 
 Conocimiento relacionado: fichas de personajes, lugares, conceptos, acontecimientos, hechos, cronologías, fuentes, anotaciones, hipótesis, imágenes y vínculos tipados.
 
 Panel contextual: relaciones del fragmento activo, fuentes citadas, eventos temporales, notas asociadas y acceso a fichas relevantes.
 
 Biblioteca de referencia: materiales propios, referencias externas, metadatos bibliográficos, enlaces, citas y notas de lectura. Las fuentes pueden abrirse en el navegador o la aplicación externa correspondiente; Lintea no necesita incorporar un lector/editor PDF o HTML ni guardar una copia de cada obra consultada. Las citas, notas e imágenes que la persona quiera conservar sí forman parte del proyecto.
+
+Biblioteca lingüística y de consulta: catálogo integrable, organizado por idioma y variedad, que reúna enlaces a diccionarios generales y especializados, ortografía, sinónimos, tesauros semánticos, gramáticas, manuales de estilo, corpus de uso, terminología y obras de consulta. La persona debe poder consultar un recurso desde el texto seleccionado y, cuando resulte útil, conservar la referencia o el vínculo como fuente del proyecto. Lintea no aloja ni reproduce por defecto el contenido de estos recursos.
+
+Biblioteca abierta: facilitar la localización de obras de dominio público y publicaciones con acceso abierto, además de permitir que cada persona añada sus propios recursos. La aspiración es favorecer el conocimiento como bien común, respetando el estado jurídico efectivo de cada obra. Distinguir siempre entre acceso gratuito, acceso abierto y permiso para copiar, citar, redistribuir o adaptar. Registrar idioma, proveedor, URL, atribución, licencia o condiciones conocidas, usos permitidos y restricciones, enlace al texto aplicable y fecha de comprobación; marcar como desconocidos los derechos que no se hayan podido verificar. Solo incluir copias descargables cuando los derechos y términos del recurso lo permitan.
+
+Responsabilidad sobre derechos: Lintea debe mostrar de forma clara la información y las advertencias disponibles, enlazar a las condiciones originales y evitar presentar el acceso gratuito como permiso de reutilización. La persona decide si su uso concreto está autorizado, atendiendo también a las excepciones legales aplicables; Lintea debe procurar que esa decisión se tome con información fiable y no sustituirla por una garantía automática.
 
 Catálogos anexos: vistas editables y enlazadas de personajes, lugares, historias, conceptos y otras fichas; referencias bibliográficas y notas del autor tipo tarjeta. Cada dato tiene un registro fuente único. Las fichas admiten atributos apropiados a su tipo y enlaces externos. Desde ellas se navega a fragmentos y capítulos, distinguiendo vínculos directos de los heredados a través de un fragmento.
 
@@ -85,11 +91,29 @@ Revisión de coherencia: detección asistida de posibles contradicciones, nombre
 
 IA opcional: corrección, opinión estilística, comparación de versiones, revisión de coherencia y apoyo bibliográfico. Explicar el contexto utilizado y los límites; nunca será obligatoria.
 
-Herramientas externas: diccionarios, tesauros, correctores, catálogos bibliográficos, repositorios, visualizadores PDF e imágenes. Usar API cuando convenga; de lo contrario, ofrecer enlaces o apertura externa.
+Herramientas externas: conectar recursos lingüísticos, catálogos bibliográficos, repositorios, correctores y visualizadores mediante API cuando convenga; de lo contrario, ofrecer enlaces y apertura externa. Los catálogos deben poder ampliarse por idioma, variedad y disciplina sin exigir que Lintea mantenga una biblioteca propia de obras protegidas.
 
 Importación y exportación: formatos comunes para manuscritos (por ejemplo, Markdown, HTML, DOCX y ODT cuando sea viable) y exportación completa del proyecto, con relaciones, notas y recursos. Un manuscrito no equivale al proyecto completo.
 
-Formato portable LinteaZip: paquete `.ltz` basado en ZIP estándar, inspeccionable con herramientas comunes. Un manifiesto versionado identifica el proyecto y sus archivos; los índices JSON conservan IDs, relaciones, referencias y orden de composición. Los contenidos propios pueden usar formatos comunes como Markdown, HTML, XML, DOCX u ODT. Las fuentes externas se guardan como referencias con URL y localizador, sin exigir copias locales; los recursos opcionales que la persona decide incluir conservan su formato original.
+Propuesta inicial de formato portable LinteaZip: paquete `.ltz` basado en ZIP estándar, inspeccionable con herramientas comunes. Un manifiesto versionado identifica el proyecto y sus archivos; los índices JSON conservan IDs, relaciones, referencias y orden de composición. Los contenidos propios pueden usar formatos comunes como Markdown, HTML, XML, DOCX u ODT. Las fuentes externas se guardan como referencias con URL y localizador, sin exigir copias locales; los recursos opcionales que la persona decide incluir conservan su formato original. La propuesta no se considera exhaustiva ni cerrada hasta completar el modelo de relaciones y decidir qué historial y metadatos de colaboración exportar.
+
+### Dirección de interfaz y edición
+
+La aplicación debe ofrecer un mapa reconocible de sus funciones antes de profundizar en herramientas avanzadas. El panel contextual concentra información y controles relacionados con el proyecto y el elemento actual; sus secciones y las áreas de navegación laterales podrán reordenarse para que cada persona priorice su flujo. La ayuda extensa abre una página de lectura cómoda; el panel puede conservar un resumen y el recordatorio de atajos. «Acerca de Lintea» presenta el propósito y el estado del producto sin atribuir datos de autoría aún no acordados.
+
+Separar dos sistemas visuales. La **skin del texto** es un paquete importable, prediseñado y no editable dentro de Lintea: contiene manifiesto, CSS y recursos asociados (por ejemplo, tipografías con sus licencias). Define conjuntamente familias y tamaños de texto, jerarquías de títulos, colores, formato de página, márgenes e interlineado. Se instala en la carpeta de skins de la persona; el proyecto elige una skin instalada y conserva su identificador y versión. La **skin de interfaz** controla solo la aplicación (por ejemplo, claro u oscuro) y es una preferencia de uso, independiente de la presentación del manuscrito. La licencia de cada recurso se conserva y se verifica antes de redistribuirlo en una copia del proyecto.
+
+La barra de edición debe operar sobre estructura semántica —párrafos, títulos, listas, énfasis, subíndices, notas, referencias e imágenes— y presentar esa estructura mediante la skin elegida. La skin no debe convertir el manuscrito en una imagen ni mezclar formato de presentación con contenido. Antes de sustituir el texto plano actual por un editor enriquecido, definir cómo se migran los documentos existentes, se representan los recursos y se conservan los anclajes, el historial y la exportación. Los comandos habituales incluyen deshacer/rehacer, cortar/copiar/pegar y selección; se habilitan según el contexto y el portapapeles.
+
+Propuesta de base para el editor: guardar contenido como HTML semántico validado y versionado, sin estilos en línea; usar una proyección de texto plano para búsqueda, recuentos y recuperación de anclajes. Los documentos actuales se interpretan como texto plano y se migran a párrafos sin alterar su lectura. Los anclajes guardan cita y contexto de esa proyección, no offsets en el HTML. Las imágenes se almacenan como recursos del proyecto con ID estable y el contenido las referencia por ID. El editor debe aislar la biblioteca que use tras un adaptador para no exportar su formato interno como formato canónico. Antes de fijar esta propuesta, hacer una prueba pequeña que confirme que selección, pegado, undo/redo, anclajes, búsqueda y migración se conservan.
+
+Paquete propuesto para una skin de texto: directorio identificable con `manifest.json`, hoja CSS y carpeta opcional de recursos. El manifiesto declara nombre, versión, formatos de página admitidos, recursos incluidos y licencias. La importación instala el paquete en la carpeta de datos de usuario; Lintea ofrece vista previa, activación y retirada, pero no edición del CSS. El proyecto almacena el ID y la versión elegida. Los paquetes instalados y sus dependencias se incluirán en la salvaguarda cuando la licencia permita redistribuirlos; en otro caso se guardará la referencia y se advertirá que habrá que instalar la skin para reproducir la vista exacta.
+
+La búsqueda del proyecto debe mostrar coincidencias con contexto, tipo y ubicación, y llevar a la coincidencia exacta en el documento cuando sea posible; los anclajes que ya existen son el punto de partida, no un sustituto de encontrar texto literal. El recuento podrá alternar entre caracteres, palabras y páginas calculadas según la skin/formato activo; el cálculo de páginas se presenta como estimación hasta la vista de impresión.
+
+Los documentos podrán incluirse o excluirse de perfiles de publicación y reordenarse para crear una salida completa sin alterar la estructura de trabajo. La salida puede generar automáticamente tabla de contenidos e índices elegidos por la persona; debe distinguir el proyecto íntegro del manuscrito publicado y conservar las relaciones en la salvaguarda completa.
+
+Preferencias iniciales para diseñar: skin del texto; tema de interfaz; corrección automática activada/desactivada; visibilidad de contadores y tipo de recuento; orden de paneles/secciones. Las preferencias visuales se aplican en conjunto mediante presets y no exponen controles para editar CSS dentro de Lintea.
 
 
 ## 6. Modelo conceptual de datos
@@ -137,19 +161,29 @@ Sin telemetría por defecto. Los datos de proyectos no se comparten con servicio
 
 ## 9. Plan por fases
 
-Fase 0 — Especificación y prueba de concepto: documentar arquitectura y modelo; demostrar identificadores, relaciones y recuperación de anclajes tras editar.
+La secuencia prioriza primero un núcleo local fiable y un modelo amplio de relaciones; después, la colaboración entre dispositivos; y solo entonces, cerrar el formato de intercambio para que represente fielmente el proyecto. El orden es orientativo y debe revisarse con el uso real.
 
-Fase 1 — Núcleo utilizable: proyectos, documentos, fragmentos, notas, etiquetas, guardado local, búsqueda básica y exportación sencilla.
+Fase 0 — Fundamentos y prueba de concepto: documentar el modelo, los identificadores estables y los anclajes; probar recuperación tras editar y registrar decisiones pendientes sin fijar tecnologías antes de tiempo.
 
-Fase 2 — Relaciones y contexto: fichas de entidades, fuentes, panel contextual, vínculos desde fragmentos y navegación entre elementos.
+Fase 1 — Núcleo local y flexible: proyectos, documentos, fragmentos, notas, etiquetas, guardado fiable, búsqueda y edición básica. Mantener la arquitectura abierta a nuevos tipos de relación y necesidades que aparezcan al usar la aplicación.
 
-Fase 3 — Cronología, tablero y versiones: vistas complementarias, comparación y restauración; pruebas de persistencia y migraciones.
+Fase 2 — Relaciones completas: terminar fichas, fuentes, vínculos tipados, anclajes, notas explicativas, composición, navegación, cronología y vistas contextuales. Definir qué estados del historial abarcan relaciones y anotaciones, y cómo se recuperan.
 
-Fase 4 — Biblioteca e importación/exportación: metadatos, recursos adjuntos, formato de proyecto documentado y exportación de manuscrito.
+Fase 3 — Historial de cambios y colaboración: diseñar y probar cambios identificables que puedan mostrarse en distintos terminales, conservar autoría y contexto, propagarse sin perder trabajo y permitir revisión o recuperación. Comparar sincronización mediante servidor intermedio, P2P y opciones híbridas. Resolver primero requisitos de trabajo sin conexión, concurrencia, conflictos, privacidad y permisos; no se elige aún un transporte ni se presupone edición simultánea carácter a carácter.
 
-Fase 5 — Revisión y extensibilidad: reglas de coherencia configurables, integraciones útiles y acciones de IA opcionales con consentimiento.
+Fase 4 — Exportación e importación exhaustivas: fijar el formato del proyecto después de conocer sus relaciones, recursos, versiones, autoría y cambios colaborativos. Debe poder reconstruir el contenido y las conexiones sin pérdida; la exportación de manuscrito será una vista derivada del proyecto completo.
 
-Fase 6 — Calidad y publicación: pruebas de regresión, accesibilidad, instaladores, copias de seguridad, documentación, guía de contribución, revisión de licencias y publicación.
+Fase 5 — Completar interfaz y herramientas: editor semántico y skins, preferencias, ayuda, atajos, navegación reordenable, selección para publicación, índices automáticos y contadores. Profundizar después la revisión de coherencia, biblioteca avanzada, tablero, funciones de apoyo e integraciones o IA opcionales con consentimiento, guiadas por el uso observado.
+
+Fase 6 — Calidad y publicación: accesibilidad, pruebas de regresión, migraciones, copias de seguridad, gestión segura del ciclo de vida de proyectos (incluida su eliminación explícita), instaladores, documentación, guía de contribución, licencias y publicación.
+
+La interfaz y la edición básica deben ser útiles y coherentes antes de dar por cerrada la fase de herramientas. Lintea no pretende competir con procesadores especializados: debe facilitar redactar y organizar el texto, dejando que las relaciones y el contexto aporten el valor diferencial.
+
+### Dirección de colaboración (objetivo; arquitectura por decidir)
+
+Lintea aspira a permitir que varias personas o terminales trabajen sobre un proyecto y vean cambios originados en otros lugares. La colaboración forma parte del núcleo definitivo junto con las relaciones, la persistencia y la recuperación. El modelo debe conservar identificadores, procedencia y anclajes, y permitir examinar qué cambió, quién lo cambió y cómo llegó al proyecto.
+
+La estrategia de sincronización sigue abierta: servidor intermedio, conexión P2P o una combinación. Antes de elegir, se compararán fiabilidad, privacidad, funcionamiento sin conexión, facilidad de recuperación, complejidad de conflictos, coste de operación y accesibilidad. Las salvaguardas y versiones locales pueden informar la forma de representar cambios, pero no se da por decidido que un historial de instantáneas sea suficiente como protocolo de colaboración. La prueba de concepto deberá mostrar cambios entre terminales y ensayar cambios simultáneos antes de comprometer el formato de exportación.
 
 Los hitos se deciden por pruebas verificables, no solo por calendario. Las estimaciones son orientativas: una versión útil puede requerir muchos meses y una madura, años, especialmente aprendiendo a la vez.
 
@@ -182,7 +216,7 @@ Priorizar fiabilidad, relaciones duraderas, recuperación, exportación y privac
 
 Este documento es una guía viva. Las decisiones pueden cambiar cuando una prueba muestre una opción mejor, documentando motivo, coste de migración y efecto sobre los principios.
 
-Pendiente: nombre comercial definitivo y comprobación legal; licencia del repositorio; esquema detallado; formato de proyecto; integración SQLite/Tauri; formatos prioritarios; estrategia de respaldo; extensiones; proveedores de IA y política de privacidad específica.
+Pendiente: nombre comercial definitivo y comprobación legal; licencia del repositorio; esquema detallado y cobertura de relaciones; integración SQLite/Tauri; modelo de colaboración, identidad y permisos; sincronización P2P, mediante servidor o híbrida; funcionamiento sin conexión y resolución de conflictos; historial de cambios compartido; formato exhaustivo de proyecto y estrategia de respaldo; eliminación segura de proyectos; formatos de manuscrito; extensiones; proveedores de IA y política de privacidad específica.
 
 ### Observaciones de interfaz para una próxima iteración
 

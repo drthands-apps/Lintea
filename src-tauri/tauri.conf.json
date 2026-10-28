@@ -13,9 +13,12 @@
     "windows": [
       {
         "title": "lintea",
-        "width": 800,
-        "height": 600,
+        "width": 1360,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 680,
         "resizable": true,
+        "maximized": true,
         "fullscreen": false
       }
     ],

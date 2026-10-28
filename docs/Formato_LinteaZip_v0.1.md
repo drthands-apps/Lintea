@@ -1,5 +1,7 @@
 # Formato portable LinteaZip 0.1
 
+Esta es una propuesta inicial para explorar la portabilidad, no un formato cerrado ni la especificación exhaustiva de la exportación definitiva. El esquema se revisará después de completar el modelo de relaciones y decidir qué historial y metadatos de colaboración deben conservarse.
+
 LinteaZip es el formato abierto para exportar, respaldar, compartir y recuperar un proyecto completo de Lintea. Es un ZIP estándar con la extensión `.ltz`, que se puede abrir con cualquier descompresor ZIP. La aplicación puede seguir trabajando sobre SQLite; el archivo portable no sustituye la base de trabajo activa.
 
 ## Estructura

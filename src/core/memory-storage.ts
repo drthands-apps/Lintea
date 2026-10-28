@@ -49,13 +49,13 @@ export class MemoryProjectStorage implements ProjectStorage {
   private readonly tagAssignments = new Map<string, TagAssignment>();
 
   async listProjects(): Promise<Project[]> {
-  return [...this.projects.values()].map(copyProject);
-}
+    return [...this.projects.values()].map(copyProject);
+  }
 
   async getProject(projectId: Id): Promise<Project | null> {
-  const project = this.projects.get(projectId);
-  return project ? copyProject(project) : null;
-}
+    const project = this.projects.get(projectId);
+    return project ? copyProject(project) : null;
+  }
 
   async createProject(project: Project): Promise<void> {
     if (this.projects.has(project.id)) {
@@ -315,7 +315,9 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   }
 
   async listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
-    return [...this.tagAssignments.values()].filter((item) => item.projectId === projectId).map((item) => ({ ...item }));
+    return [...this.tagAssignments.values()].filter((item) => item.projectId === projectId).map((item) => ({
+      ...item, ...(item.anchor ? { anchor: { ...item.anchor } } : {})
+    }));
   }
 
   async assignTag(assignment: TagAssignment): Promise<void> {
@@ -328,11 +330,13 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
           ? this.sources.get(assignment.targetId)?.projectId === assignment.projectId
           : this.notes.get(assignment.targetId)?.projectId === assignment.projectId;
     if (!targetExists) throw new Error("El elemento etiquetado no pertenece a este proyecto.");
-    this.tagAssignments.set(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}`, { ...assignment });
+    const anchorKey = assignment.anchor ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}` : "";
+    this.tagAssignments.set(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`, { ...assignment });
   }
 
   async unassignTag(assignment: TagAssignment): Promise<void> {
-    this.tagAssignments.delete(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}`);
+    const anchorKey = assignment.anchor ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}` : "";
+    this.tagAssignments.delete(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`);
   }
 
   private removeTagAssignments(projectId: Id, targetType: TagAssignment["targetType"], targetId: Id): void {

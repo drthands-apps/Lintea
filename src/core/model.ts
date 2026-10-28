@@ -25,6 +25,17 @@ export type RelationKind =
   | "related_to"
   | "inspired_by";
 
+/** Canonical labels shared by the interface, exports and future collaboration tools. */
+export const relationKindLabels: Record<RelationKind, string> = {
+  mentions: "Menciona",
+  participates_in: "Participa en",
+  occurs_at: "Sucede en",
+  supported_by: "Está sustentado por",
+  contradicts: "Contradice",
+  related_to: "Relacionado con",
+  inspired_by: "Inspirado en"
+};
+
 export type DocumentKind = "chapter" | "fragment" | "note";
 
 export type ProjectKind =
@@ -44,6 +55,8 @@ export interface ProjectContext {
   primaryLanguage: string;
   additionalLanguages: string[];
   editorialStyle: EditorialStyle;
+  /** Installed text skin used to present or publish this project's documents. */
+  textSkinId?: string;
 }
 
 export interface Project {
@@ -167,6 +180,8 @@ export interface TagAssignment {
   tagId: Id;
   targetType: TagTargetType;
   targetId: Id;
+  /** When present, the tag applies to a passage in a document. */
+  anchor?: Pick<FragmentAnchor, "documentId" | "quote" | "prefix" | "suffix">;
 }
 
 export function createId(): Id {
