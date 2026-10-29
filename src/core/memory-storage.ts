@@ -257,7 +257,7 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
     return [...this.versions.values()]
       .filter((version) => version.documentId === documentId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
       .map((version) => ({ ...version }));
   }
 

@@ -55,10 +55,32 @@ export type DocumentChange =
  
 
 /**
- * Fotografía inmutable de un documento en un momento determinado.
+ * Relación del historial: arista entre dos estados del pasado.
+ * No apunta: indica los extremos de una transición.
+ */
+export interface VersionRelation {
+  id: Id;
+  documentId: Id;
+  projectId: Id;
+  fromStateId: Id;
+  toStateId: Id;
+  capturedAt: string;
+  label?: string;
+  note?: string;
+  /** Marcada por el usuario como olvidada: se conserva pero no se muestra en la ruta principal. */
+  rejected?: boolean;
+  /** El estado de origen ya no existe. */
+  fromMissing?: boolean;
+  /** El estado de destino ya no existe. */
+  toMissing?: boolean;
+}
+
+/**
+ * Estado pasado de un documento.
  *
- * Una versión conserva el título y el texto originales.
- * No depende de React, del almacenamiento ni de ningún proveedor externo.
+ * - Si `pinned: true`, es un estado conservado íntegro y no depende de otro.
+ * - Si `pinned` está ausente o es `false`, es un delta que se reconstruye
+ *   aplicando `changes` sobre `baseStateId`.
  */
 export interface DocumentVersion {
   id: Id;
@@ -66,26 +88,30 @@ export interface DocumentVersion {
   projectId: Id;
   title: string;
   text: string;
-  createdAt: string;
+  capturedAt: string;
   documentUpdatedAt: string;
   label?: string;
   note?: string;
- /** Cadena del historial (modelo B: base = estado actual). */
-  parentVersionId?: Id;
+
+  /** Si es true, el estado se guarda íntegro y sirve como origen de rutas. */
+  pinned?: boolean;
+
+  /** Solo en estados delta: estado desde el que se calculó el delta. */
+  baseStateId?: Id;
+  /** Solo en estados delta: cambios respecto a baseStateId. */
   changes?: DocumentChange[];
+  /** Si baseStateId ya no existe, el delta no se puede reconstruir. */
+  baseMissing?: boolean;
 
   /** Hashes de integridad. */
   contentHash?: string;
   referenceHash?: string;
 
-  /** Referencias activas en el estado que representa esta versión. */
+  /** Referencias activas en el estado. */
   relationIds?: Id[];
   tagAssignmentKeys?: string[];
   authorNoteIds?: Id[];
   compositionEntryIds?: Id[];
-
-  /** Marca de rama anterior tras una restauración. */
-  archived?: boolean;
 }
 
 /**
@@ -156,10 +182,13 @@ export function createDocumentVersion(
     projectId: document.projectId,
     title: document.title,
     text: document.text,
-    createdAt: date.toISOString(),
+    capturedAt: date.toISOString(),
     documentUpdatedAt: document.updatedAt,
     label: optionalText(input.label),
     note: optionalText(input.note)
+    // Sin pinned, sin baseStateId, sin changes: es un estado íntegro.
+    // Los hashes y las referencias se calculan en la capa de servicio,
+    // que conoce el proyecto completo.
   };
 }
 
@@ -306,156 +335,26 @@ export function referenceHash(
 
 export function reconstructVersion(
   versions: DocumentVersion[],
-  versionId: Id,
-  currentState: DocumentState
+  relations: VersionRelation[],
+  targetStateId: Id,
+  currentDocument: import("./model.js").DocumentRecord
 ): DocumentState {
-  const byId = new Map<Id, DocumentVersion>();
-  for (const version of versions) byId.set(version.id, version);
-  // La base actual siempre está disponible para cerrar la cadena.
-  byId.set(CURRENT_BASE_VERSION_ID, currentStateToVersion(currentState));
-
-  const target = byId.get(versionId);
-  if (!target) {
-    throw new Error("La versión solicitada no existe en el historial.");
-  }
-
-  // Si se pide reconstruir la base actual, ya la tenemos.
-  if (target.id === CURRENT_BASE_VERSION_ID) {
-    return currentState;
-  }
-
-  // Una versión con `changes` definido es un delta, aunque el array esté vacío.
-  // Un delta siempre necesita padre; una base (sin `changes`) no.
-  if (target.changes !== undefined && !target.parentVersionId) {
-    throw new Error("Un delta debe tener parentVersionId; sin padre no se puede reconstruir.");
-  }
-
- 
-
-  // Recorremos la cadena de padres hasta la base, detectando ciclos.
-  const chain: DocumentVersion[] = [];
-  const visited = new Set<Id>();
-  let cursor: DocumentVersion | undefined = target;
-  while (cursor) {
-    if (visited.has(cursor.id)) {
-      throw new Error("El historial contiene un ciclo en la cadena de versiones.");
-    }
-    visited.add(cursor.id);
-    chain.push(cursor);
-    if (!cursor.parentVersionId) break;
-    const parent = byId.get(cursor.parentVersionId);
-    if (!parent) {
-      throw new Error("Falta el padre de una versión en el historial.");
-    }
-    if (parent.documentId !== target.documentId) {
-      throw new Error("El padre de una versión pertenece a otro documento.");
-    }
-    cursor = parent;
-  }
-
-  // Validación de deltas sin parentVersionId explícito en el modelo B:
-  // una versión con `changes` debe tener padre, salvo que sea la base.
-  for (const version of chain) {
-    if (version.changes && version.changes.length > 0 && !version.parentVersionId) {
-      // En el modelo B, la base es el estado actual y no tiene cambios.
-      // Un delta sin padre es un error de integridad.
-      if (version.id !== target.id || chain.length > 1) {
-        throw new Error("Un delta debe tener parentVersionId.");
-      }
-    }
-  }
-
-  // Reconstrucción: partimos del estado actual (la base) y aplicamos
-  // los cambios hacia atrás desde la versión más reciente de la cadena
-  // hasta la versión objetivo.
-  let state: DocumentState = { ...currentState };
-
-  // La cadena va de la versión objetivo hacia la base. Para aplicar
-  // cambios hacia atrás, invertimos: partimos del estado actual y
-  // aplicamos los cambios de cada versión desde la base hacia la objetivo.
-  const ordered = [...chain].reverse();
-
-  for (const version of ordered) {
-    if (!version.changes || version.changes.length === 0) {
-      // Versión base: su contenido es el que ya tiene (instantánea completa).
-      state = {
-        ...state,
-        title: version.title,
-        text: version.text,
-        capturedAt: version.createdAt,
-        documentUpdatedAt: version.documentUpdatedAt
-      };
-      continue;
-    }
-    for (const change of version.changes) {
-      state = applyChange(state, change);
-    }
-    state = {
-      ...state,
-      capturedAt: version.createdAt,
-      documentUpdatedAt: version.documentUpdatedAt
-    };
-  }
-
-  // Verificación de integridad de contenido.
-  if (target.contentHash) {
-    const actual = contentHash(state);
-    if (actual !== target.contentHash) {
-      throw new Error(
-        `La versión ${target.id} está corrupta: el contentHash no coincide.`
-      );
-    }
-  }
-
-  // Verificación de integridad de referencias.
-  const expectedReferences = {
-    relationIds: target.relationIds ?? [],
-    tagAssignmentKeys: target.tagAssignmentKeys ?? [],
-    authorNoteIds: target.authorNoteIds ?? [],
-    compositionEntryIds: target.compositionEntryIds ?? []
-  };
-  if (target.referenceHash) {
-    const actual = referenceHash(expectedReferences);
-    if (actual !== target.referenceHash) {
-      throw new Error(
-        `La versión ${target.id} está corrupta: el referenceHash no coincide.`
-      );
-    }
-  }
-
-  // Estado de las referencias de la versión frente al proyecto actual.
-  const referenceStatus: DocumentState["referenceStatus"] = {
-    relations: {},
-    tagAssignments: {},
-    authorNotes: {},
-    compositionEntries: {}
-  };
-  const currentRelations = new Set(currentState.relationIds);
-  const currentTagKeys = new Set(currentState.tagAssignmentKeys);
-  const currentNotes = new Set(currentState.authorNoteIds);
-  const currentEntries = new Set(currentState.compositionEntryIds);
-  for (const id of expectedReferences.relationIds) {
-    referenceStatus.relations[id] = currentRelations.has(id) ? "ok" : "missing";
-  }
-  for (const key of expectedReferences.tagAssignmentKeys) {
-    referenceStatus.tagAssignments[key] = currentTagKeys.has(key) ? "ok" : "missing";
-  }
-  for (const id of expectedReferences.authorNoteIds) {
-    referenceStatus.authorNotes[id] = currentNotes.has(id) ? "ok" : "missing";
-  }
-  for (const id of expectedReferences.compositionEntryIds) {
-    referenceStatus.compositionEntries[id] = currentEntries.has(id) ? "ok" : "missing";
-  }
-
-  return {
-    ...state,
-    relationIds: expectedReferences.relationIds,
-    tagAssignmentKeys: expectedReferences.tagAssignmentKeys,
-    authorNoteIds: expectedReferences.authorNoteIds,
-    compositionEntryIds: expectedReferences.compositionEntryIds,
-    referenceStatus
-  };
+  throw new Error("no implementado");
 }
+
+export function computeReferenceStatus(
+  state: DocumentState,
+  currentReferences: {
+    relationIds: Id[];
+    tagAssignmentKeys: string[];
+    authorNoteIds: Id[];
+    compositionEntryIds: Id[];
+  }
+): DocumentState["referenceStatus"] {
+  throw new Error("no implementado");
+}
+
+
 
 function applyChange(state: DocumentState, change: DocumentChange): DocumentState {
   switch (change.kind) {
@@ -488,66 +387,29 @@ function applyChange(state: DocumentState, change: DocumentChange): DocumentStat
 
 export function canDeleteVersion(
   versions: DocumentVersion[],
-  versionId: Id
+  relations: VersionRelation[],
+  stateId: Id
 ): {
   allowed: boolean;
   reason?: string;
-  blockingVersions: Array<{ id: Id; label?: string; capturedAt: string }>;
+  blockingRelations: Array<{
+    id: Id;
+    label?: string;
+    capturedAt: string;
+    fromStateId: Id;
+    toStateId: Id;
+  }>;
 } {
-  const target = versions.find((version) => version.id === versionId);
-  if (!target) {
-    return {
-      allowed: false,
-      reason: "La versión solicitada no existe en el historial.",
-      blockingVersions: []
-    };
-  }
-
-  const children = versions.filter((version) => version.parentVersionId === versionId);
-  if (children.length === 0) {
-    return { allowed: true, blockingVersions: [] };
-  }
-
-  const blockingVersions = children.map((child) => ({
-    id: child.id,
-    label: child.label,
-    capturedAt: child.createdAt
-  }));
-
-  const describe = (child: { label?: string; capturedAt: string }) => {
-    const date = new Date(child.capturedAt);
-    const formatted = Number.isNaN(date.getTime())
-      ? child.capturedAt
-      : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
-    return `«${child.label ?? "Sin título"}» (${formatted})`;
-  };
-
-  const names = blockingVersions.map(describe).join(", ");
-  return {
-    allowed: false,
-    reason: `No se puede eliminar «${target.label ?? target.title}» porque ${names} depende${blockingVersions.length === 1 ? "" : "n"} de ella. Elimina primero esa versión o conserva ambas.`,
-    blockingVersions
-  };
+  throw new Error("no implementado");
 }
 /**
- * Construye la versión sintética que representa el estado actual.
- * Es la raíz de la cadena del historial en el modelo B: los deltas
- * apuntan a ella con parentVersionId = CURRENT_BASE_VERSION_ID.
+ * Valida la estructura del grafo de relaciones del historial.
+ * Lanza un error claro si hay ciclos, extremos inexistentes,
+ * auto-relaciones o duplicados. No modifica nada.
  */
-export function currentStateToVersion(currentState: DocumentState): DocumentVersion {
-  return {
-    id: CURRENT_BASE_VERSION_ID,
-    documentId: currentState.documentId,
-    projectId: currentState.projectId,
-    title: currentState.title,
-    text: currentState.text,
-    createdAt: currentState.capturedAt,
-    documentUpdatedAt: currentState.documentUpdatedAt,
-    contentHash: contentHash(currentState),
-    referenceHash: referenceHash(currentState),
-    relationIds: currentState.relationIds,
-    tagAssignmentKeys: currentState.tagAssignmentKeys,
-    authorNoteIds: currentState.authorNoteIds,
-    compositionEntryIds: currentState.compositionEntryIds
-  };
+export function validateRelations(
+  relations: VersionRelation[],
+  versions: DocumentVersion[]
+): void {
+  throw new Error("no implementado");
 }

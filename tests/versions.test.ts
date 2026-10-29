@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from "vitest";
 import type { DocumentRecord } from "../src/core/model.js";
 import {
@@ -28,7 +27,7 @@ describe("versiones de documentos", () => {
     expect(version.title).toBe(document.title);
     expect(version.text).toBe(document.text);
     expect(version.label).toBe("Primera idea");
-    expect(version.createdAt).toBe("2026-01-02T10:00:00.000Z");
+    expect(version.capturedAt).toBe("2026-01-02T10:00:00.000Z");
   });
 
   it("omite etiquetas y notas vacías", () => {
@@ -39,6 +38,28 @@ describe("versiones de documentos", () => {
 
     expect(version.label).toBeUndefined();
     expect(version.note).toBeUndefined();
+  });
+
+  it("una versión recién creada no es delta ni está conservada", () => {
+    const version = createDocumentVersion(document);
+
+    expect(version.pinned).toBeUndefined();
+    expect(version.baseStateId).toBeUndefined();
+    expect(version.changes).toBeUndefined();
+  });
+
+  it("no calcula hashes ni referencias en la capa de dominio", () => {
+    const version = createDocumentVersion(document);
+
+    // Los hashes y las referencias los rellena el servicio, que conoce
+    // el proyecto completo. createDocumentVersion es una función pura
+    // sobre un único documento.
+    expect(version.contentHash).toBeUndefined();
+    expect(version.referenceHash).toBeUndefined();
+    expect(version.relationIds).toBeUndefined();
+    expect(version.tagAssignmentKeys).toBeUndefined();
+    expect(version.authorNoteIds).toBeUndefined();
+    expect(version.compositionEntryIds).toBeUndefined();
   });
 
   it("recupera una versión sin alterar el documento original", () => {

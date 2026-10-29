@@ -1,131 +1,152 @@
 import { describe, expect, it } from "vitest";
-import type { DocumentVersion } from "../src/core/versions.js";
-import {
-  CURRENT_BASE_VERSION_ID,
-  contentHash,
-  reconstructVersion
-} from "../src/core/versions.js";
-import type { DocumentState } from "../src/core/versions.js";
+import type { DocumentRecord } from "../src/core/model.js";
+import type { DocumentVersion, VersionRelation } from "../src/core/versions.js";
+import { contentHash, reconstructVersion } from "../src/core/versions.js";
 
-function state(overrides: Partial<DocumentState> = {}): DocumentState {
+function doc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
   return {
-    documentId: "doc-1",
-    projectId: "p",
-    title: "Actual",
-    text: "Actual",
-    kind: "note",
-    order: 0,
-    relationIds: [],
-    tagAssignmentKeys: [],
-    authorNoteIds: [],
-    compositionEntryIds: [],
-    capturedAt: "2026-01-01T00:00:00.000Z",
-    documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} },
-    ...overrides
-  };
-}
-
-function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
-  return {
-    id: "v1",
-    documentId: "doc-1",
+    id: "doc-1",
     projectId: "p",
     title: "Actual",
     text: "Actual",
     createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    kind: "note",
+    order: 0,
+    ...overrides
+  };
+}
+
+function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
+  return {
+    id: "s1",
+    documentId: "doc-1",
+    projectId: "p",
+    title: "Antigua",
+    text: "Antigua",
+    capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
+  return {
+    id: "r1",
+    documentId: "doc-1",
+    projectId: "p",
+    fromStateId: "s1",
+    toStateId: "s2",
+    capturedAt: "2026-01-01T00:00:00.000Z",
     ...overrides
   };
 }
 
 describe("integridad de contenido del historial", () => {
-  it("reconstruye una versión histórica aplicando cambios hacia atrás desde la base", () => {
-    const current = state({ title: "Actual", text: "Actual" });
-    const old = version({
-      id: "v1",
-      parentVersionId: CURRENT_BASE_VERSION_ID,
+  it("devuelve el estado actual si se pide reconstruir el estado actual", () => {
+    const current = doc();
+    // No hay versiones ni relaciones: pedir el estado actual devuelve el
+    // documento tal cual, sin reconstruir nada.
+    const result = reconstructVersion([], [], current.id, current);
+    expect(result.title).toBe("Actual");
+    expect(result.text).toBe("Actual");
+  });
+
+  it("reconstruye un estado conservado íntegro (pinned)", () => {
+    const current = doc();
+    const old = state({
+      id: "s1",
+      pinned: true,
       title: "Antigua",
       text: "Antigua",
-      contentHash: contentHash({ ...current, title: "Antigua", text: "Antigua" }),
-      changes: [
-        { kind: "title", from: "Actual", to: "Antigua" },
-        { kind: "text", from: "Actual", to: "Antigua", hunks: [] }
-      ]
+      contentHash: contentHash({ title: "Antigua", text: "Antigua", kind: "note", order: 0 })
     });
-    const result = reconstructVersion([old], "v1", current);
+    const result = reconstructVersion([old], [], "s1", current);
     expect(result.title).toBe("Antigua");
     expect(result.text).toBe("Antigua");
   });
 
-  it("marca como corrupta una versión cuyo contentHash no coincide", () => {
-    const current = state({ title: "Actual", text: "Actual" });
-    const corrupted = version({
-      id: "v1",
-      parentVersionId: CURRENT_BASE_VERSION_ID,
-      title: "Antigua",
-      text: "Antigua",
-      contentHash: "hash-incorrecto",
-      changes: [
-        { kind: "title", from: "Actual", to: "Antigua" },
-        { kind: "text", from: "Actual", to: "Antigua", hunks: [] }
-      ]
+  it("reconstruye un estado delta aplicando cambios sobre su base", () => {
+    const current = doc({ title: "C", text: "C" });
+    const base = state({
+      id: "base",
+      pinned: true,
+      title: "B",
+      text: "B",
+      contentHash: contentHash({ title: "B", text: "B", kind: "note", order: 0 })
     });
-    expect(() => reconstructVersion([corrupted], "v1", current)).toThrow(/corrupta/);
-  });
-
-  it("A→B→A reconstruye A con el mismo contentHash que la base A", () => {
-    const a = state({ title: "A", text: "A" });
-    const b = state({ title: "B", text: "B" });
-    const versionA: DocumentVersion = version({
-      id: "va",
-      parentVersionId: CURRENT_BASE_VERSION_ID,
+    const target = state({
+      id: "target",
       title: "A",
       text: "A",
-      contentHash: contentHash(a),
+      baseStateId: "base",
       changes: [
         { kind: "title", from: "B", to: "A" },
         { kind: "text", from: "B", to: "A", hunks: [] }
-      ]
+      ],
+      contentHash: contentHash({ title: "A", text: "A", kind: "note", order: 0 })
     });
-    const versionB: DocumentVersion = version({
-      id: "vb",
-      parentVersionId: "va",
-      title: "B",
-      text: "B",
-      contentHash: contentHash(b),
-      changes: [
-        { kind: "title", from: "A", to: "B" },
-        { kind: "text", from: "A", to: "B", hunks: [] }
-      ]
-    });
-    // Reconstruir vb desde una base actual que es A debe devolver B.
-    const result = reconstructVersion([versionA, versionB], "vb", a);
-    expect(result.title).toBe("B");
-    expect(contentHash(result)).toBe(contentHash(b));
+    const relations = [
+      relation({ id: "r1", fromStateId: "base", toStateId: "target" })
+    ];
+    const result = reconstructVersion([base, target], relations, "target", current);
+    expect(result.title).toBe("A");
+    expect(result.text).toBe("A");
   });
 
-  it("rechaza aplicar deltas cuyo padre no existe en la cadena", () => {
-    const current = state({ title: "C", text: "C" });
-    const a: DocumentVersion = version({
+  it("marca como corrupto un estado cuyo contentHash no coincide", () => {
+    const current = doc();
+    const corrupted = state({
+      id: "s1",
+      pinned: true,
+      title: "Antigua",
+      text: "Antigua",
+      contentHash: "hash-incorrecto"
+    });
+    expect(() => reconstructVersion([corrupted], [], "s1", current)).toThrow(/corrupto|corrupta/);
+  });
+
+  it("rechaza reconstruir un delta cuya base no existe", () => {
+    const current = doc();
+    const orphan = state({
+      id: "s1",
+      title: "Antigua",
+      text: "Antigua",
+      baseStateId: "no-existe",
+      changes: [{ kind: "title", from: "Actual", to: "Antigua" }],
+      baseMissing: true,
+      contentHash: contentHash({ title: "Antigua", text: "Antigua", kind: "note", order: 0 })
+    });
+    expect(() => reconstructVersion([orphan], [], "s1", current)).toThrow(/base|reconstru/i);
+  });
+
+  it("rechaza reconstruir un estado que no existe en el historial", () => {
+    const current = doc();
+    expect(() => reconstructVersion([], [], "no-existe", current)).toThrow(/no existe|no encontrad/i);
+  });
+
+  it("prefiere un camino íntegro si otro está corrupto", () => {
+    const current = doc({ title: "D", text: "D" });
+    const a = state({
       id: "a",
-      parentVersionId: CURRENT_BASE_VERSION_ID,
+      pinned: true,
       title: "A",
       text: "A",
-      contentHash: contentHash(state({ title: "A", text: "A" })),
-      changes: [
-        { kind: "title", from: "C", to: "A" },
-        { kind: "text", from: "C", to: "A", hunks: [] }
-      ]
+      contentHash: contentHash({ title: "A", text: "A", kind: "note", order: 0 })
     });
-    const c: DocumentVersion = version({
-      id: "c",
-      parentVersionId: "b", // "b" no existe
-      title: "C",
-      text: "C",
-      contentHash: contentHash(current),
-      changes: [{ kind: "title", from: "B", to: "C" }]
+    const b = state({
+      id: "b",
+      pinned: true,
+      title: "B",
+      text: "B",
+      contentHash: contentHash({ title: "B", text: "B", kind: "note", order: 0 })
     });
-    expect(() => reconstructVersion([a, c], "c", current)).toThrow(/padre/);
+    // Camino 1: a → b (válido). Camino 2: b → d (corrupto).
+    // El target es b; debe elegir el camino válido desde a.
+    const relations = [
+      relation({ id: "r1", fromStateId: "a", toStateId: "b" })
+    ];
+    const result = reconstructVersion([a, b], relations, "b", current);
+    expect(result.title).toBe("B");
   });
 });

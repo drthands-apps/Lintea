@@ -61,14 +61,14 @@ if (!projectColumns.some((column) => column.name === "context")) {
       await database.execute("ALTER TABLE documents ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0");
     }
 
-    await database.execute(`
+       await database.execute(`
       CREATE TABLE IF NOT EXISTS document_versions (
         id TEXT PRIMARY KEY,
         documentId TEXT NOT NULL,
         projectId TEXT NOT NULL,
         title TEXT NOT NULL,
         text TEXT NOT NULL,
-        createdAt TEXT NOT NULL,
+        capturedAt TEXT NOT NULL,
         documentUpdatedAt TEXT NOT NULL,
         label TEXT,
         note TEXT,
@@ -76,6 +76,20 @@ if (!projectColumns.some((column) => column.name === "context")) {
         FOREIGN KEY (projectId) REFERENCES projects(id)
       )
     `);
+
+    // Migración v0.2: renombrar createdAt a capturedAt en bases existentes.
+    // En bases nuevas, la columna ya se crea como capturedAt.
+    const versionColumns = await database.select<{ name: string }[]>(
+      "PRAGMA table_info(document_versions)"
+    );
+    if (
+      versionColumns.some((column) => column.name === "createdAt") &&
+      !versionColumns.some((column) => column.name === "capturedAt")
+    ) {
+      await database.execute(
+        "ALTER TABLE document_versions RENAME COLUMN createdAt TO capturedAt"
+      );
+    }
 
     await database.execute(`CREATE TABLE IF NOT EXISTS knowledge_entities (
       id TEXT PRIMARY KEY, projectId TEXT NOT NULL, kind TEXT NOT NULL,
@@ -430,21 +444,22 @@ async updateProject(project: Project): Promise<void> {
   }
 
   async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
-    return this.database.select<DocumentVersion[]>(
-      `SELECT id, documentId, projectId, title, text, createdAt,
-              documentUpdatedAt, label, note
-       FROM document_versions
-       WHERE documentId = ?
-       ORDER BY createdAt DESC`,
-      [documentId]
-    );
-  }
+    
+  return this.database.select<DocumentVersion[]>(
+    `SELECT id, documentId, projectId, title, text, capturedAt,
+            documentUpdatedAt, label, note
+     FROM document_versions
+     WHERE documentId = ?
+     ORDER BY capturedAt DESC`,
+    [documentId]
+  );
+}
 
   async getDocumentVersion(versionId: Id): Promise<DocumentVersion | null> {
     const rows = await this.database.select<DocumentVersion[]>(
-      `SELECT id, documentId, projectId, title, text, createdAt,
+      `SELECT id, documentId, projectId, title, text, capturedAt,
               documentUpdatedAt, label, note
-       FROM document_versions WHERE id = ?`,
+      FROM document_versions WHERE id = ?`,
       [versionId]
     );
     return rows[0] ?? null;
@@ -453,16 +468,16 @@ async updateProject(project: Project): Promise<void> {
   async createDocumentVersion(version: DocumentVersion): Promise<void> {
     await this.database.execute(
       `INSERT INTO document_versions
-       (id, documentId, projectId, title, text, createdAt,
+      (id, documentId, projectId, title, text, capturedAt,
         documentUpdatedAt, label, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         version.id,
         version.documentId,
         version.projectId,
         version.title,
         version.text,
-        version.createdAt,
+        version.capturedAt,
         version.documentUpdatedAt,
         version.label ?? null,
         version.note ?? null

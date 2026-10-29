@@ -1,72 +1,119 @@
 import { describe, expect, it } from "vitest";
-import type { DocumentVersion } from "../src/core/versions.js";
-import { reconstructVersion } from "../src/core/versions.js";
-import type { DocumentState } from "../src/core/versions.js";
+import type { DocumentVersion, VersionRelation } from "../src/core/versions.js";
+import { validateRelations } from "../src/core/versions.js";
 
-function state(overrides: Partial<DocumentState> = {}): DocumentState {
+function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
   return {
+    id: "s1",
     documentId: "doc-1",
     projectId: "p",
     title: "Título",
     text: "Texto",
-    kind: "note",
-    order: 0,
-    relationIds: [],
-    tagAssignmentKeys: [],
-    authorNoteIds: [],
-    compositionEntryIds: [],
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} },
     ...overrides
   };
 }
 
-function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
+function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
   return {
-    id: "v1",
+    id: "r1",
     documentId: "doc-1",
     projectId: "p",
-    title: "Título",
-    text: "Texto",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    documentUpdatedAt: "2026-01-01T00:00:00.000Z",
+    fromStateId: "s1",
+    toStateId: "s2",
+    capturedAt: "2026-01-01T00:00:00.000Z",
     ...overrides
   };
 }
 
 describe("integridad estructural del historial", () => {
-  it("rechaza un delta sin parentVersionId", () => {
-    const current = state();
-    const bad: DocumentVersion = version({ id: "v2", changes: [], contentHash: "x", referenceHash: "y" });
-    expect(() => reconstructVersion([bad], "v2", current)).toThrow(/parentVersionId/);
+  it("acepta un grafo lineal sin ciclos", () => {
+    const versions = [
+      state({ id: "s1" }),
+      state({ id: "s2" }),
+      state({ id: "s3" })
+    ];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s3" })
+    ];
+    expect(() => validateRelations(relations, versions)).not.toThrow();
   });
 
-  it("rechaza un delta cuyo padre no existe", () => {
-    const current = state();
-    const bad: DocumentVersion = version({ id: "v2", parentVersionId: "no-existe", changes: [], contentHash: "x", referenceHash: "y" });
-    expect(() => reconstructVersion([bad], "v2", current)).toThrow(/padre/);
+  it("rechaza un ciclo directo", () => {
+    const versions = [state({ id: "s1" }), state({ id: "s2" })];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" })
+    ];
+    expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
   });
 
-  it("rechaza un delta cuyo padre es de otro documento", () => {
-    const current = state();
-    const parent: DocumentVersion = version({ id: "v1", documentId: "otro", changes: [], contentHash: "x", referenceHash: "y" });
-    const child: DocumentVersion = version({ id: "v2", parentVersionId: "v1", changes: [], contentHash: "x", referenceHash: "y" });
-    expect(() => reconstructVersion([parent, child], "v2", current)).toThrow(/documento/);
+  it("rechaza un ciclo indirecto", () => {
+    const versions = [
+      state({ id: "s1" }),
+      state({ id: "s2" }),
+      state({ id: "s3" })
+    ];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s3" }),
+      relation({ id: "r3", fromStateId: "s3", toStateId: "s1" })
+    ];
+    expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
   });
 
-  it("rechaza un ciclo en la cadena", () => {
-    const current = state();
-    const a: DocumentVersion = version({ id: "a", parentVersionId: "b", changes: [], contentHash: "x", referenceHash: "y" });
-    const b: DocumentVersion = version({ id: "b", parentVersionId: "a", changes: [], contentHash: "x", referenceHash: "y" });
-    expect(() => reconstructVersion([a, b], "a", current)).toThrow(/ciclo/);
+  it("rechaza una relación con un extremo inexistente", () => {
+    const versions = [state({ id: "s1" })];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" })
+    ];
+    expect(() => validateRelations(relations, versions)).toThrow(/extremo/);
   });
 
-  it("acepta una instantánea antigua sin parentVersionId como base", () => {
-    const current = state({ title: "Actual", text: "Actual" });
-    const base: DocumentVersion = version({ id: "v1", title: "Antigua", text: "Antigua" });
-    const result = reconstructVersion([base], "v1", current);
-    expect(result.title).toBe("Antigua");
-    expect(result.text).toBe("Antigua");
+  it("rechaza una relación que conecta un estado consigo mismo", () => {
+    const versions = [state({ id: "s1" })];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s1" })
+    ];
+    expect(() => validateRelations(relations, versions)).toThrow(/mismo/);
+  });
+
+  it("rechaza relaciones duplicadas entre los mismos extremos", () => {
+    const versions = [state({ id: "s1" }), state({ id: "s2" })];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s1", toStateId: "s2" })
+    ];
+    expect(() => validateRelations(relations, versions)).toThrow(/duplicada/);
+  });
+
+  it("acepta relaciones invertidas entre los mismos extremos", () => {
+    const versions = [state({ id: "s1" }), state({ id: "s2" })];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" })
+    ];
+    // s1 → s2 y s2 → s1 forman un ciclo, así que se rechaza.
+    expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
+  });
+
+  it("acepta un grafo con un cruce y varios caminos", () => {
+    // s1 → s2 → s4
+    // s1 → s3 → s4
+    const versions = [
+      state({ id: "s1" }),
+      state({ id: "s2" }),
+      state({ id: "s3" }),
+      state({ id: "s4" })
+    ];
+    const relations = [
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
+      relation({ id: "r2", fromStateId: "s1", toStateId: "s3" }),
+      relation({ id: "r3", fromStateId: "s2", toStateId: "s4" }),
+      relation({ id: "r4", fromStateId: "s3", toStateId: "s4" })
+    ];
+    expect(() => validateRelations(relations, versions)).not.toThrow();
   });
 });

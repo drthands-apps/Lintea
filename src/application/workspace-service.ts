@@ -24,7 +24,10 @@ import type {
   CreateVersionInput,
   DocumentVersion
 } from "../core/versions.js";
+import type { VersionRelation } from "../core/versions.js";
 import type { ProjectStorage } from "../core/storage.js";
+
+
 
 /**
  * Coordina las operaciones de Lintea con el almacenamiento.
@@ -39,6 +42,7 @@ export class WorkspaceService {
   listProjects(): Promise<Project[]> {
     return this.storage.listProjects();
   }
+  
 
   async createProject(input: CreateProjectInput): Promise<Project> {
     const project = buildProject(input, this.now);
@@ -98,7 +102,9 @@ export class WorkspaceService {
     await this.storage.createDocument(document);
     return document;
   }
-
+getDocument(documentId: Id): Promise<DocumentRecord | null> {
+  return this.storage.getDocument(documentId);
+}
   async updateDocument(
     documentId: Id,
     changes: UpdateDocumentInput
@@ -560,4 +566,7 @@ export class WorkspaceService {
   }
   return trimmed;
 }
+  listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+    throw new Error("no implementado");
+  }
 }

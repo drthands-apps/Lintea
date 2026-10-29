@@ -2346,7 +2346,7 @@ export default function App() {
                           <details className="version-card" key={version.id}>
                             <summary>
                               <strong>{version.label || version.title || "Documento sin título"}</strong>
-                              <time dateTime={version.createdAt}>{new Date(version.createdAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}</time>
+                              <time dateTime={version.capturedAt}>{new Date(version.capturedAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}</time>
                             </summary>
                             <div className="version-card-content">
                               {version.note && <p>{version.note}</p>}
