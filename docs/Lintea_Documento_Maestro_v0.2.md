@@ -59,6 +59,28 @@ Revelación progresiva: mostrar primero lo necesario y reservar funciones avanza
 Accesibilidad: contemplar navegación por teclado, contraste, escalado de texto, distintos tamaños de ventana e internacionalización, empezando por español.
 
 
+## 4.1. Decisiones de producto derivadas del análisis de la competencia
+
+Tras evaluar herramientas como Bibisco, yWriter, Campfire y Tintero, se han fijado las siguientes decisiones para la experiencia de Lintea, buscando siempre la coherencia con los principios del proyecto:
+
+El texto siempre es el centro (WYSIWYG estricto).
+Las vistas separadas de "escritura" y "lectura" son un residuo de herramientas antiguas. Lintea debe ofrecer un único editor semántico donde el formato se aplica en tiempo real. La interfaz no debe ocultar el texto detrás de paneles excesivos ni de utilidades de escritura recargadas; debe ser discreta, permitiendo que la persona se concentre en redactar.
+
+Contexto flotante, no invasivo.
+A diferencia de otras aplicaciones donde abrir una ficha o un personaje te saca de la pantalla de escritura, Lintea apuesta por un panel contextual lateral (o ventanas flotantes) que permiten consultar la información mientras se escribe. La información no debe secuestrar la pantalla; debe acompañar al texto.
+
+Creación contextual inmediata (menú de clic derecho).
+Se integrará un menú contextual en el editor. Al seleccionar un fragmento de texto y hacer clic derecho, la persona podrá crear una ficha (personaje, lugar, objeto o idea) y enlazarla automáticamente a ese pasaje específico en un solo paso. Esta eliminación de la fricción (no tener que ir a la barra lateral, crear la ficha, volver al texto y buscar el pasaje) es un valor diferencial frente a la competencia.
+
+Fichas exhaustivas pero flexibles.
+Frente a las fichas rígidas (Bibisco) o excesivamente esquemáticas (yWriter), Lintea ofrece un sistema de plantillas sugeridas pero editables. Un personaje puede tener Biografía, Psicología y Motivaciones, o solo una nota caótica; el usuario decide la profundidad. Las fichas incluirán soporte para imágenes (como avatares o referencias visuales), y cada una mostrará su "contexto" (todos los puntos de la obra donde aparece, distinguiendo vínculos directos de los heredados).
+
+Estructura de la obra y guía literaria.
+No habrá asistentes de creación guiada (wizards) que impongan metodologías. El proyecto se define con un título y, opcionalmente, un género. Para la estructura, el Tablero de conexiones será la herramienta principal, permitiendo visualizar los hilos argumentales, las subtramas y cómo convergen los fragmentos. Se evitarán las etiquetas de estado impuestas (como "primera/tercera persona") para dejar paso a etiquetas semánticas creadas por el usuario (ej. "hilo A", "revisar", "investigar").
+
+Transparencia radical y cero fricción legal.
+Otras herramientas saturan con múltiples pantallas de aceptación de términos y condiciones, lo que genera desconfianza. Lintea debe ser transparente: sin telemetría oculta, sin cuentas obligatorias y con una política de privacidad clara y breve. El software debe ser de código abierto y local-first, de modo que la persona nunca sienta que su manuscrito está retenido.
+
 ## 5. Capacidades previstas
 
 Núcleo: proyectos, documentos, fragmentos identificables, notas, etiquetas, búsqueda, guardado fiable y recuperación.

@@ -310,23 +310,6 @@ it("rechaza actualizar un proyecto inexistente", async () => {
   expect(back.id).toBe(first.id);
   expect(await service.listDocumentVersions(document.id)).toHaveLength(2);
   });
-  it("no registra una tercera versión si el contenido vuelve a un estado anterior", async () => {
-    const { service } = createTestService();
-    const project = await service.createProject({ title: "P" });
-    const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
-    });
-    const first = await service.saveDocumentVersion(document.id);
-
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
-    await service.saveDocumentVersion(document.id);
-
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado A." });
-    const back = await service.saveDocumentVersion(document.id);
-
-    expect(back.id).toBe(first.id);
-    expect(await service.listDocumentVersions(document.id)).toHaveLength(2);
-  });
   it("rechaza URLs no válidas al crear una fuente", async () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });

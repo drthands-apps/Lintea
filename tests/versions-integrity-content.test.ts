@@ -9,10 +9,25 @@ function doc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     projectId: "p",
     title: "Actual",
     text: "Actual",
+    kind: "note",
+    order: 0, 
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    kind: "note",
-    order: 0,
+    ...overrides
+  };
+}
+
+function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
+  return {
+    id: "v1",
+    documentId: "doc-1",
+    projectId: "p",
+    title: "Título",
+    text: "Texto",
+    kind: "note",       
+    order: 0,           
+    capturedAt: "2026-01-01T00:00:00.000Z",
+    documentUpdatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides
   };
 }
@@ -24,6 +39,8 @@ function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     projectId: "p",
     title: "Antigua",
     text: "Antigua",
+    kind: "note",
+    order: 0,  
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides

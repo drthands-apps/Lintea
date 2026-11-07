@@ -1,8 +1,19 @@
 
 import { createId, createRelation } from "../core/model.js";
 import type {
-  AuthorNote, AuthorNoteColor, CompositionEntry, DocumentRecord, EntityKind, Id, KnowledgeEntity,
-  Project, Relation, RelationTargetType, SourceRecord, Tag, TagAssignment
+  AuthorNote,
+  AuthorNoteColor,
+  CompositionEntry, 
+  DocumentRecord, 
+  EntityKind, 
+  Id, 
+  KnowledgeEntity,
+  Project, 
+  Relation, 
+  RelationTargetType, 
+  SourceRecord, 
+  Tag, 
+  TagAssignment
 } from "../core/model.js";
 import {
   createDocument as buildDocument,
@@ -18,14 +29,21 @@ import type {
 } from "../core/projects.js";
 import {
   createDocumentVersion as buildVersion,
-  restoreDocumentVersion as buildRestoredDocument
+  restoreDocumentVersion as buildRestoredDocument,
+  reconstructVersion,
+  canDeleteVersion,
+  contentHash,
+  referenceHash
 } from "../core/versions.js";
 import type {
   CreateVersionInput,
-  DocumentVersion
+  DocumentVersion,
+  DocumentState
 } from "../core/versions.js";
+import type { DocumentChange } from "../core/versions.js";
 import type { VersionRelation } from "../core/versions.js";
 import type { ProjectStorage } from "../core/storage.js";
+
 
 
 
@@ -422,80 +440,225 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return this.storage.deleteAuthorNote(projectId, noteId);
   }
 
+    listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
+    return this.storage.listDocumentVersions(documentId);
+  }
+
   /**
    * Crea un punto de recuperación.
    *
    * Si el contenido coincide con la versión más reciente y no se ha
    * solicitado una etiqueta o nota, evita guardar una copia redundante.
    */
-  async saveDocumentVersion(
+     async saveDocumentVersion(
     documentId: Id,
     input: CreateVersionInput = {}
   ): Promise<DocumentVersion> {
     const document = await this.storage.getDocument(documentId);
-
     if (!document) {
       throw new Error("No se puede versionar un documento que no existe.");
     }
 
+    const projectId = document.projectId;
     const versions = await this.storage.listDocumentVersions(documentId);
-    // El historial conserva estados únicos. Al restaurar o volver a guardar
-    // un contenido ya registrado, se reutiliza su entrada aunque no sea la última.
-    const existingState = versions.find((version) =>
-      version.title === document.title && version.text === document.text
+    
+    // 1. Obtener referencias actuales
+    const [relations, tagAssignments, notes, composition] = await Promise.all([
+      this.storage.listRelations(projectId),
+      this.storage.listTagAssignments(projectId),
+      this.storage.listAuthorNotes(projectId),
+      document.kind === "fragment" ? this.storage.listCompositionEntries(documentId) : Promise.resolve([])
+    ]);
+
+    const relationIds = relations
+      .filter(r => (r.fromId === documentId && (r.fromType === "document" || r.fromType === "fragment")) || 
+                   (r.toId === documentId && (r.toType === "document" || r.toType === "fragment")))
+      .map(r => r.id);
+      
+    const tagAssignmentKeys = tagAssignments
+      .filter(t => t.targetType === "document" && t.targetId === documentId)
+      .map(t => `${t.tagId}:${t.targetType}:${t.targetId}${t.anchor ? `:${t.anchor.documentId}:${t.anchor.quote}:${t.anchor.prefix}:${t.anchor.suffix}` : ""}`);
+
+    const authorNoteIds = notes.filter(n => n.targetId === documentId && n.targetType === "document").map(n => n.id);
+    const compositionEntryIds = composition.map(c => c.id);
+
+    const currentState: DocumentState = {
+      documentId: document.id,
+      projectId: document.projectId,
+      title: document.title,
+      text: document.text,
+      kind: document.kind ?? "note",
+      order: document.order ?? 0,
+      relationIds,
+      tagAssignmentKeys,
+      authorNoteIds,
+      compositionEntryIds,
+      capturedAt: this.now().toISOString(),
+      documentUpdatedAt: document.updatedAt,
+      referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} }
+    };
+
+    const currentContentHash = contentHash(currentState);
+    const currentRefHash = referenceHash(currentState);
+
+    // 2. Comprobar si ya existe este estado
+    const existingState = versions.find(v => 
+      v.contentHash === currentContentHash && v.referenceHash === currentRefHash
     );
-    if (existingState) return existingState;
 
-    const version = buildVersion(document, input, this.now);
-    await this.storage.createDocumentVersion(version);
+    const latest = versions[0]; // La más reciente
 
-    return version;
-  }
+    // Si ya existe el estado, creamos la relación (si hay una versión anterior)
+    if (existingState) {
+      if (latest && latest.id !== existingState.id) {
+        await this.storage.createVersionRelation({
+          id: createId(),
+          documentId: document.id,
+          projectId: document.projectId,
+          fromStateId: latest.id,
+          toStateId: existingState.id,
+          capturedAt: this.now().toISOString(),
+          label: "Vuelta a estado anterior"
+        });
+      }
+      return existingState;
+    }
 
-  listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
-    return this.storage.listDocumentVersions(documentId);
+    // 3. Si es la primera versión (estado conservado)
+    if (versions.length === 0) {
+      const version = buildVersion(document, input, this.now);
+      const pinnedVersion: DocumentVersion = {
+        ...version,
+        pinned: true,
+        contentHash: currentContentHash,
+        referenceHash: currentRefHash,
+        relationIds,
+        tagAssignmentKeys,
+        authorNoteIds,
+        compositionEntryIds,
+        kind: document.kind ?? "note",
+        order: document.order ?? 0
+      };
+      await this.storage.createDocumentVersion(pinnedVersion);
+      return pinnedVersion;
+    }
+
+    // 4. Si ya hay versiones, creamos un delta
+    const deltaVersion: DocumentVersion = {
+      ...buildVersion(document, input, this.now),
+      pinned: false,
+      baseStateId: latest.id,
+      changes: ([
+        { kind: "title", from: latest.title, to: document.title },
+        { kind: "text", from: latest.text, to: document.text, hunks: [] },
+        { kind: "kind", from: latest.kind ?? "note", to: document.kind ?? "note" },
+        { kind: "order", from: latest.order ?? 0, to: document.order ?? 0 }
+      ] as DocumentChange[]).filter((c) => {
+        if (c.kind === "title" || c.kind === "text" || c.kind === "kind" || c.kind === "order") {
+          return c.from !== c.to;
+        }
+        return true;
+      }),
+      contentHash: currentContentHash,
+      referenceHash: currentRefHash,
+      relationIds,
+      tagAssignmentKeys,
+      authorNoteIds,
+      compositionEntryIds,
+      kind: document.kind ?? "note",
+      order: document.order ?? 0
+    };
+
+    await this.storage.createDocumentVersion(deltaVersion);
+    
+    // Crear la relación que conecta la versión anterior con esta
+    await this.storage.createVersionRelation({
+      id: createId(),
+      documentId: document.id,
+      projectId: document.projectId,
+      fromStateId: latest.id,
+      toStateId: deltaVersion.id,
+      capturedAt: this.now().toISOString()
+    });
+
+    return deltaVersion;
   }
 
   /**
    * Recupera una versión sin perder el estado que estaba activo.
    * Conserva primero el estado actual si su contenido es diferente.
    */
-  async restoreDocumentVersion(
+   async restoreDocumentVersion(
     documentId: Id,
     versionId: Id
   ): Promise<DocumentRecord> {
     const current = await this.storage.getDocument(documentId);
-
     if (!current) {
       throw new Error("No se puede recuperar un documento que no existe.");
     }
 
-    const version = await this.storage.getDocumentVersion(versionId);
+    const versions = await this.storage.listDocumentVersions(documentId);
+    const relations = await this.storage.listVersionRelations(documentId);
+    const target = versions.find((v) => v.id === versionId);
 
-    if (!version || version.documentId !== documentId) {
+    if (!target) {
       throw new Error("La versión solicitada no pertenece a este documento.");
     }
 
-    if (current.title === version.title && current.text === version.text) {
-      return current;
-    }
+    // 1. Reconstruir el estado de la versión objetivo
+    const reconstructedState = reconstructVersion(
+      versions,
+      relations,
+      versionId,
+      current
+    );
 
-    // Guardar el estado actual antes de sustituirlo.
-    await this.saveDocumentVersion(documentId);
+    // 2. Guardar el estado actual como una nueva versión antes de sobreescribirlo,
+    // para no perder lo que había (esto crea una relación implícita).
+    const currentVersion = await this.saveDocumentVersion(documentId, {
+      label: "Antes de restaurar"
+    });
 
-    const restored = buildRestoredDocument(current, version, this.now);
+    // 3. Escribir el estado reconstruido en el documento
+    const restored: DocumentRecord = {
+      ...current,
+      title: reconstructedState.title,
+      text: reconstructedState.text,
+      kind: reconstructedState.kind as any,
+      order: reconstructedState.order,
+      updatedAt: this.now().toISOString()
+    };
     await this.storage.updateDocument(restored);
+
+    // 4. Crear la relación "restaurado desde X"
+    await this.storage.createVersionRelation({
+      id: createId(),
+      documentId: documentId,
+      projectId: current.projectId,
+      fromStateId: currentVersion.id, // El estado que acabamos de guardar
+      toStateId: target.id,           // El estado restaurado
+      capturedAt: this.now().toISOString(),
+      label: `Restaurado desde «${target.label || target.title}»`
+    });
 
     return restored;
   }
 
-  listTags(projectId: Id): Promise<Tag[]> {
-    return this.storage.listTags(projectId);
+   async deleteDocumentVersion(
+    documentId: Id,
+    versionId: Id
+  ): Promise<void> {
+    const versions = await this.storage.listDocumentVersions(documentId);
+    const relations = await this.storage.listVersionRelations(documentId);
+
+    const check = canDeleteVersion(versions, relations, versionId);
+    if (!check.allowed) {
+      throw new Error(check.reason);
+    }
+
+    await this.storage.deleteDocumentVersion(versionId);
   }
 
-  listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
-    return this.storage.listTagAssignments(projectId);
-  }
 
   async createTag(projectId: Id, inputName: string): Promise<Tag> {
     const name = inputName.trim().replace(/\s+/g, " ");
@@ -532,6 +695,10 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     await this.storage.deleteTag(projectId, tagId);
   }
 
+  listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
+    return this.storage.listTagAssignments(projectId);
+  }
+
   async setTagAssignment(input: TagAssignment, assigned: boolean): Promise<void> {
     if (input.anchor && (input.targetType !== "document" || input.anchor.documentId !== input.targetId || !input.anchor.quote.trim())) {
       throw new Error("El pasaje etiquetado debe pertenecer al documento seleccionado.");
@@ -566,7 +733,7 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
   }
   return trimmed;
 }
-  listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
-    throw new Error("no implementado");
+    listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+    return this.storage.listVersionRelations(documentId);
   }
 }

@@ -11,8 +11,9 @@ import type {
   Tag,
   TagAssignment
 } from "./model.js";
-import type { DocumentVersion } from "./versions.js";
+import type { DocumentVersion, VersionRelation } from "./versions.js";
 import type { ProjectStorage } from "./storage.js";
+
 
 function copyProject(project: Project): Project {
   return {
@@ -40,6 +41,7 @@ export class MemoryProjectStorage implements ProjectStorage {
   private readonly projects = new Map<Id, Project>();
   private readonly documents = new Map<Id, DocumentRecord>();
   private readonly versions = new Map<Id, DocumentVersion>();
+  private readonly versionRelations = new Map<Id, VersionRelation>();
   private readonly entities = new Map<Id, KnowledgeEntity>();
   private readonly sources = new Map<Id, SourceRecord>();
   private readonly relations = new Map<Id, Relation>();
@@ -69,6 +71,8 @@ export class MemoryProjectStorage implements ProjectStorage {
   if (!this.projects.has(project.id)) {
     throw new Error("No se puede actualizar un proyecto que no existe.");
   }
+
+  
 
   this.projects.set(project.id, copyProject(project));
 }
@@ -143,6 +147,7 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
         this.notes.set(id, { ...note, targetType: undefined, targetId: undefined });
       }
     }
+
   }
 
   async listSources(projectId: Id): Promise<SourceRecord[]> {
@@ -284,6 +289,10 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     this.versions.set(version.id, { ...version });
   }
 
+  async deleteDocumentVersion(versionId: Id): Promise<void> {
+    this.versions.delete(versionId);
+  }
+
   async listTags(projectId: Id): Promise<Tag[]> {
     return [...this.tags.values()].filter((tag) => tag.projectId === projectId)
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -344,6 +353,33 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
       if (assignment.projectId === projectId && assignment.targetType === targetType && assignment.targetId === targetId) {
         this.tagAssignments.delete(key);
       }
+    }
+  }
+  async listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+    return [...this.versionRelations.values()]
+      .filter((relation) => relation.documentId === documentId)
+      .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
+      .map((relation) => ({ ...relation }));
+  }
+
+  async createVersionRelation(relation: VersionRelation): Promise<void> {
+    if (this.versionRelations.has(relation.id)) {
+      throw new Error("Ya existe una relación de historial con ese identificador.");
+    }
+    this.versionRelations.set(relation.id, { ...relation });
+  }
+
+  async updateVersionRelation(relation: VersionRelation): Promise<void> {
+    if (!this.versionRelations.has(relation.id)) {
+      throw new Error("No se puede actualizar una relación de historial que no existe.");
+    }
+    this.versionRelations.set(relation.id, { ...relation });
+  }
+
+  async deleteVersionRelation(documentId: Id, relationId: Id): Promise<void> {
+    const relation = this.versionRelations.get(relationId);
+    if (relation?.documentId === documentId) {
+      this.versionRelations.delete(relationId);
     }
   }
 }

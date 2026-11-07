@@ -12,7 +12,7 @@ import type {
   TagAssignment
 } from "../core/model.js";
 import type { ProjectStorage } from "../core/storage.js";
-import type { DocumentVersion } from "../core/versions.js";
+import type { DocumentVersion, VersionRelation } from "../core/versions.js";
 
 type SqlRow<T> = T;
 
@@ -484,6 +484,9 @@ async updateProject(project: Project): Promise<void> {
       ]
     );
   }
+  async deleteDocumentVersion(versionId: Id): Promise<void> {
+    throw new Error("no implementado en SQLite");
+  }
 
   listTags(projectId: Id): Promise<Tag[]> {
     return this.database.select<Tag[]>(
@@ -553,5 +556,17 @@ async updateProject(project: Project): Promise<void> {
       "DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ? AND targetType = ? AND targetId = ?",
       [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]
     );
+  }
+    async listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+    throw new Error("no implementado en SQLite");
+  }
+  async createVersionRelation(relation: VersionRelation): Promise<void> {
+    throw new Error("no implementado en SQLite");
+  }
+  async updateVersionRelation(relation: VersionRelation): Promise<void> {
+    throw new Error("no implementado en SQLite");
+  }
+  async deleteVersionRelation(documentId: Id, relationId: Id): Promise<void> {
+    throw new Error("no implementado en SQLite");
   }
 }

@@ -98,6 +98,7 @@ async function loadProjectComposition(service: WorkspaceService, documents: Docu
   return entries.flat();
 }
 
+
 let workspace: WorkspaceService | undefined;
 
 async function getWorkspace(): Promise<WorkspaceService> {

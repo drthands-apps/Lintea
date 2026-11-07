@@ -33,6 +33,8 @@ function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     projectId: "p",
     title: "Actual",
     text: "Actual",
+    kind: "note",
+    order: 0, 
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides

@@ -11,25 +11,20 @@ import type {
   Tag,
   TagAssignment
 } from "./model.js";
-import type { DocumentVersion } from "./versions.js";
+import type {
+   DocumentVersion,
+   VersionRelation
+} from "./versions.js";
 
 export interface ProjectStorage {
   listProjects(): Promise<Project[]>;
-
   getProject(projectId: Id): Promise<Project | null>;
-
   createProject(project: Project): Promise<void>;
-
   updateProject(project: Project): Promise<void>;
-
   listDocuments(projectId: Id): Promise<DocumentRecord[]>;
-
   getDocument(documentId: Id): Promise<DocumentRecord | null>;
-
   createDocument(document: DocumentRecord): Promise<void>;
-
   updateDocument(document: DocumentRecord): Promise<void>;
-
   listKnowledgeEntities(projectId: Id): Promise<KnowledgeEntity[]>;
   createKnowledgeEntity(entity: KnowledgeEntity): Promise<void>;
   updateKnowledgeEntity(entity: KnowledgeEntity): Promise<void>;
@@ -50,13 +45,14 @@ export interface ProjectStorage {
   createAuthorNote(note: AuthorNote): Promise<void>;
   updateAuthorNote(note: AuthorNote): Promise<void>;
   deleteAuthorNote(projectId: Id, noteId: Id): Promise<void>;
-
   listDocumentVersions(documentId: Id): Promise<DocumentVersion[]>;
-
   getDocumentVersion(versionId: Id): Promise<DocumentVersion | null>;
-
   createDocumentVersion(version: DocumentVersion): Promise<void>;
-
+  deleteDocumentVersion(versionId: Id): Promise<void>;
+  listVersionRelations(documentId: Id): Promise<VersionRelation[]>;
+  createVersionRelation(relation: VersionRelation): Promise<void>;
+  updateVersionRelation(relation: VersionRelation): Promise<void>;
+  deleteVersionRelation(documentId: Id, relationId: Id): Promise<void>;
   listTags(projectId: Id): Promise<Tag[]>;
   createTag(tag: Tag): Promise<void>;
   updateTag(tag: Tag): Promise<void>;
