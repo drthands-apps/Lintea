@@ -77,11 +77,52 @@ if (!projectColumns.some((column) => column.name === "context")) {
       )
     `);
 
+
     // Migración v0.2: renombrar createdAt a capturedAt en bases existentes.
     // En bases nuevas, la columna ya se crea como capturedAt.
+
     const versionColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(document_versions)"
+     "PRAGMA table_info(document_versions)"
     );
+    const newVersionColumns: Array<[string, string]> = [
+      ["kind", "TEXT NOT NULL DEFAULT 'note'"],
+      ["sortOrder", "INTEGER NOT NULL DEFAULT 0"],
+      ["pinned", "INTEGER NOT NULL DEFAULT 0"],
+      ["baseStateId", "TEXT"],
+      ["baseMissing", "INTEGER NOT NULL DEFAULT 0"],
+      ["changes", "TEXT"],
+      ["contentHash", "TEXT"],
+      ["referenceHash", "TEXT"],
+      ["relationIds", "TEXT"],
+      ["tagAssignmentKeys", "TEXT"],
+      ["authorNoteIds", "TEXT"],
+      ["compositionEntryIds", "TEXT"]
+    ];
+    for (const [column, definition] of newVersionColumns) {
+      if (!versionColumns.some((c) => c.name === column)) {
+      
+        await database.execute(`ALTER TABLE document_versions ADD COLUMN ${column} ${definition}`);
+      }
+    }
+
+    await database.execute(`
+      CREATE TABLE IF NOT EXISTS version_relations (
+        id TEXT PRIMARY KEY,
+        documentId TEXT NOT NULL,
+        projectId TEXT NOT NULL,
+        fromStateId TEXT NOT NULL,
+        toStateId TEXT NOT NULL,
+        capturedAt TEXT NOT NULL,
+        label TEXT,
+        note TEXT,
+        rejected INTEGER NOT NULL DEFAULT 0,
+        fromMissing INTEGER NOT NULL DEFAULT 0,
+        toMissing INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (documentId) REFERENCES documents(id),
+        FOREIGN KEY (projectId) REFERENCES projects(id)
+      )
+    `);
+
     if (
       versionColumns.some((column) => column.name === "createdAt") &&
       !versionColumns.some((column) => column.name === "capturedAt")
@@ -230,7 +271,7 @@ async updateProject(project: Project): Promise<void> {
 
   async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     return this.database.select<DocumentRecord[]>(
-      `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS "order"
+      `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS [order]
        FROM documents WHERE projectId = ? ORDER BY sortOrder, createdAt`,
       [projectId]
     );
@@ -238,7 +279,7 @@ async updateProject(project: Project): Promise<void> {
 
   async getDocument(documentId: Id): Promise<DocumentRecord | null> {
     const rows = await this.database.select<DocumentRecord[]>(
-      `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS "order"
+      `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS [order]
        FROM documents WHERE id = ?`,
       [documentId]
     );
@@ -286,7 +327,7 @@ async updateProject(project: Project): Promise<void> {
 
   async listKnowledgeEntities(projectId: Id): Promise<KnowledgeEntity[]> {
     const rows = await this.database.select<(Omit<KnowledgeEntity, "details" | "externalLinks"> & { details: string | null; externalLinks: string | null })[]>(
-      "SELECT id, projectId, kind, title, description, details, externalLinks, sortOrder AS \"order\" FROM knowledge_entities WHERE projectId = ? ORDER BY sortOrder, title",
+      "SELECT id, projectId, kind, title, description, details, externalLinks, sortOrder AS [order] FROM knowledge_entities WHERE projectId = ? ORDER BY sortOrder, title",
       [projectId]
     );
     return rows.map(({ details, externalLinks, ...entity }) => ({
@@ -326,7 +367,7 @@ async updateProject(project: Project): Promise<void> {
 
   listSources(projectId: Id): Promise<SourceRecord[]> {
     return this.database.select<SourceRecord[]>(
-      "SELECT id, projectId, title, author, url, citation, publisher, year, doi, sortOrder AS \"order\" FROM sources WHERE projectId = ? ORDER BY sortOrder, title",
+      "SELECT id, projectId, title, author, url, citation, publisher, year, doi, sortOrder AS [order] FROM sources WHERE projectId = ? ORDER BY sortOrder, title",
       [projectId]
     );
   }
@@ -418,7 +459,7 @@ async updateProject(project: Project): Promise<void> {
 
   listAuthorNotes(projectId: Id): Promise<AuthorNote[]> {
     return this.database.select<AuthorNote[]>(
-      "SELECT id, projectId, content, color, targetType, targetId, createdAt, updatedAt, sortOrder AS \"order\" FROM author_notes WHERE projectId = ? ORDER BY sortOrder, updatedAt DESC",
+      "SELECT id, projectId, content, color, targetType, targetId, createdAt, updatedAt, sortOrder AS [order] FROM author_notes WHERE projectId = ? ORDER BY sortOrder, updatedAt DESC",
       [projectId]
     );
   }
@@ -443,22 +484,50 @@ async updateProject(project: Project): Promise<void> {
     await this.database.execute("DELETE FROM author_notes WHERE projectId = ? AND id = ?", [projectId, noteId]);
   }
 
-  async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
-    
-  return this.database.select<DocumentVersion[]>(
-    `SELECT id, documentId, projectId, title, text, capturedAt,
-            documentUpdatedAt, label, note
+ async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
+  const rows = await this.database.select<any[]>(
+    `SELECT id, documentId, projectId, title, text, kind, sortOrder,
+            capturedAt, documentUpdatedAt, label, note,
+            pinned, baseStateId, baseMissing, changes,
+            contentHash, referenceHash,
+            relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds
      FROM document_versions
      WHERE documentId = ?
      ORDER BY capturedAt DESC`,
     [documentId]
   );
+  return rows.map((row) => ({
+    id: row.id,
+    documentId: row.documentId,
+    projectId: row.projectId,
+    title: row.title,
+    text: row.text,
+    kind: row.kind ?? "note",
+    order: row.order ?? 0,
+    capturedAt: row.capturedAt,
+    documentUpdatedAt: row.documentUpdatedAt,
+    label: row.label ?? undefined,
+    note: row.note ?? undefined,
+    pinned: row.pinned === 1 ? true : undefined,
+    baseStateId: row.baseStateId ?? undefined,
+    baseMissing: row.baseMissing === 1 ? true : undefined,
+    changes: row.changes ? JSON.parse(row.changes) : undefined,
+    contentHash: row.contentHash ?? undefined,
+    referenceHash: row.referenceHash ?? undefined,
+    relationIds: row.relationIds ? JSON.parse(row.relationIds) : undefined,
+    tagAssignmentKeys: row.tagAssignmentKeys ? JSON.parse(row.tagAssignmentKeys) : undefined,
+    authorNoteIds: row.authorNoteIds ? JSON.parse(row.authorNoteIds) : undefined,
+    compositionEntryIds: row.compositionEntryIds ? JSON.parse(row.compositionEntryIds) : undefined
+  }));
 }
 
   async getDocumentVersion(versionId: Id): Promise<DocumentVersion | null> {
     const rows = await this.database.select<DocumentVersion[]>(
-      `SELECT id, documentId, projectId, title, text, capturedAt,
-              documentUpdatedAt, label, note
+       `SELECT id, documentId, projectId, title, text, kind, sortOrder,
+            capturedAt, documentUpdatedAt, label, note,
+            pinned, baseStateId, baseMissing, changes,
+            contentHash, referenceHash,
+            relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds
       FROM document_versions WHERE id = ?`,
       [versionId]
     );
@@ -467,26 +536,37 @@ async updateProject(project: Project): Promise<void> {
 
   async createDocumentVersion(version: DocumentVersion): Promise<void> {
     await this.database.execute(
-      `INSERT INTO document_versions
-      (id, documentId, projectId, title, text, capturedAt,
-        documentUpdatedAt, label, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     `INSERT INTO document_versions
+       (id, documentId, projectId, title, text, kind, sortOrder,
+        capturedAt, documentUpdatedAt, label, note,
+        pinned, baseStateId, baseMissing, changes,
+        contentHash, referenceHash,
+       relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        version.id,
-        version.documentId,
-        version.projectId,
-        version.title,
-        version.text,
-        version.capturedAt,
-        version.documentUpdatedAt,
-        version.label ?? null,
-        version.note ?? null
+        version.id, version.documentId, version.projectId,
+        version.title, version.text, version.kind, version.order,
+        version.capturedAt, version.documentUpdatedAt,
+        version.label ?? null, version.note ?? null,
+        version.pinned ? 1 : 0,
+        version.baseStateId ?? null,
+        version.baseMissing ? 1 : 0,
+        version.changes ? JSON.stringify(version.changes) : null,
+        version.contentHash ?? null,
+        version.referenceHash ?? null,
+        version.relationIds ? JSON.stringify(version.relationIds) : null,
+        version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
+        version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
+        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null
       ]
     );
   }
+
   async deleteDocumentVersion(versionId: Id): Promise<void> {
     throw new Error("no implementado en SQLite");
   }
+  
+  
 
   listTags(projectId: Id): Promise<Tag[]> {
     return this.database.select<Tag[]>(
@@ -557,16 +637,71 @@ async updateProject(project: Project): Promise<void> {
       [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]
     );
   }
-    async listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
-    throw new Error("no implementado en SQLite");
+  async listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+    const rows = await this.database.select<any[]>(
+      `SELECT id, documentId, projectId, fromStateId, toStateId,
+              capturedAt, label, note, rejected, fromMissing, toMissing
+      FROM version_relations
+      WHERE documentId = ?
+      ORDER BY capturedAt DESC`,
+      [documentId]
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      documentId: row.documentId,
+      projectId: row.projectId,
+      fromStateId: row.fromStateId,
+      toStateId: row.toStateId,
+      capturedAt: row.capturedAt,
+      label: row.label ?? undefined,
+      note: row.note ?? undefined,
+      rejected: row.rejected === 1 ? true : undefined,
+      fromMissing: row.fromMissing === 1 ? true : undefined,
+      toMissing: row.toMissing === 1 ? true : undefined
+    }));
   }
+
   async createVersionRelation(relation: VersionRelation): Promise<void> {
-    throw new Error("no implementado en SQLite");
+    await this.database.execute(
+      `INSERT INTO version_relations
+       (id, documentId, projectId, fromStateId, toStateId,
+        capturedAt, label, note, rejected, fromMissing, toMissing)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        relation.id, relation.documentId, relation.projectId,
+        relation.fromStateId, relation.toStateId, relation.capturedAt,
+        relation.label ?? null, relation.note ?? null,
+        relation.rejected ? 1 : 0,
+        relation.fromMissing ? 1 : 0,
+        relation.toMissing ? 1 : 0
+      ]
+    );
   }
+
   async updateVersionRelation(relation: VersionRelation): Promise<void> {
-    throw new Error("no implementado en SQLite");
+    const result = await this.database.execute(
+      `UPDATE version_relations SET
+        fromStateId = ?, toStateId = ?, capturedAt = ?, label = ?, note = ?,
+        rejected = ?, fromMissing = ?, toMissing = ?
+      WHERE id = ? AND documentId = ?`,
+      [
+        relation.fromStateId, relation.toStateId, relation.capturedAt,
+        relation.label ?? null, relation.note ?? null,
+        relation.rejected ? 1 : 0,
+        relation.fromMissing ? 1 : 0,
+        relation.toMissing ? 1 : 0,
+        relation.id, relation.documentId
+      ]
+    );
+    if (result.rowsAffected === 0) {
+      throw new Error("No se puede actualizar una relación que no existe.");
+    }
   }
+
   async deleteVersionRelation(documentId: Id, relationId: Id): Promise<void> {
-    throw new Error("no implementado en SQLite");
+    await this.database.execute(
+      "DELETE FROM version_relations WHERE documentId = ? AND id = ?",
+      [documentId, relationId]
+    );
   }
 }

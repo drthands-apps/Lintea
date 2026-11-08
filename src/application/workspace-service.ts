@@ -673,6 +673,10 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return tag;
   }
 
+  listTags(projectId: Id): Promise<Tag[]> {
+    return this.storage.listTags(projectId);
+  }
+
   async updateTag(projectId: Id, tagId: Id, inputName: string): Promise<Tag> {
     const name = inputName.trim().replace(/\s+/g, " ");
     if (!name) throw new Error("El nombre de la etiqueta no puede estar vacío.");
