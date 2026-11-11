@@ -18,12 +18,14 @@ import type {
   TagTargetType
 } from "../../src/core/model.js";
 import { createId, relationKindLabels } from "../../src/core/model.js";
+
 import { MemoryProjectStorage } from "../../src/core/memory-storage.js";
 import { SqliteProjectStorage } from "../../src/adapters/sqlite-project-storage.js";
 import { WorkspaceService } from "../../src/application/workspace-service.js";
 import type { ProjectStorage } from "../../src/core/storage.js";
 import { createFragmentAnchor, resolveFragmentAnchor } from "../../src/core/anchors.js";
-import type { DocumentVersion } from "../../src/core/versions.js";
+import type { DocumentVersion} from "../../src/core/versions.js";
+import { canDeleteVersion } from "../../src/core/versions.js";
 import { buildProjectSearchIndex, searchIndexedProject } from "../../src/core/search.js";
 import type { SearchResult } from "../../src/core/search.js";
 
@@ -287,12 +289,19 @@ export default function App() {
   const [documentVersions, setDocumentVersions] = useState<DocumentVersion[]>([]);
   const [versionLabel, setVersionLabel] = useState("");
   const [versionNote, setVersionNote] = useState("");
+  const [editingVersionLabel, setEditingVersionLabel] = useState<Id | null>(null);
+  const [pendingRestoreVersion, setPendingRestoreVersion] = useState<DocumentVersion | null>(null);
+  const [restoreLabelDraft, setRestoreLabelDraft] = useState("");
+  const [versionLabelDraft, setVersionLabelDraft] = useState("");
+  const [deletingVersionId, setDeletingVersionId] = useState<Id | null>(null);
   const [showNewDocumentMenu, setShowNewDocumentMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const activeDocument = documents.find((doc) => doc.id === activeId);
+  const restoreTarget = pendingRestoreVersion;
+  const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
+  const [blockingRelationIds, setBlockingRelationIds] = useState<Id[]>([]);
   const searchIndex = useMemo(() => buildProjectSearchIndex({
     documents, entities, sources, notes: authorNotes, tags, assignments: tagAssignments
   }), [documents, entities, sources, authorNotes, tags, tagAssignments]);
@@ -847,23 +856,62 @@ export default function App() {
     }
   }
 
-  async function restoreVersion(version: DocumentVersion) {
+    function requestRestoreVersion(version: DocumentVersion) {
     if (!activeDocument) return;
-    if (!window.confirm(`¿Recuperar «${version.label || version.title}»? El estado actual se conservará antes en el historial.`)) return;
+    setPendingRestoreVersion(version);
+    setRestoreLabelDraft(`Antes de restaurar «${version.label || version.title || "documento"}»`);
+  }
+
+  async function confirmRestoreVersion() {
+    if (!activeDocument || !pendingRestoreVersion) return;
     setSaving(true);
     try {
       const service = await getWorkspace();
       await service.updateDocument(activeDocument.id, {
         title: activeDocument.title, text: activeDocument.text
       });
-      const restored = await service.restoreDocumentVersion(activeDocument.id, version.id);
+      const restored = await service.restoreDocumentVersion(activeDocument.id, pendingRestoreVersion.id);
       setDocuments((current) => current.map((item) => item.id === restored.id ? { ...item, ...restored } : item));
       setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      setPendingRestoreVersion(null);
+      setRestoreLabelDraft("");
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo recuperar la versión.");
     } finally {
       setSaving(false);
+    }
+  }
+    async function saveVersionLabel(version: DocumentVersion) {
+    if (!activeDocument) return;
+    try {
+      const service = await getWorkspace();
+      await service.updateDocumentVersionLabel(activeDocument.id, version.id, versionLabelDraft);
+      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      setEditingVersionLabel(null);
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo editar la etiqueta.");
+    }
+  }
+
+  async function confirmDeleteVersion(version: DocumentVersion) {
+    if (!activeDocument) return;
+    try {
+      const service = await getWorkspace();
+      await service.deleteDocumentVersion(activeDocument.id, version.id);
+      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      setDeletingVersionId(null);
+      setError(null);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "No se pudo eliminar la versión.";
+      setBlockingMessage(message);
+      const service = await getWorkspace();
+      const versions = await service.listDocumentVersions(activeDocument.id);
+      const relations = await service.listVersionRelations(activeDocument.id);
+      const check = canDeleteVersion(versions, relations, version.id);
+      setBlockingRelationIds(check.blockingRelations.map((r) => r.id));
+      setDeletingVersionId(null);
     }
   }
 
@@ -1420,6 +1468,7 @@ export default function App() {
   }
 
   return (
+    <>
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
@@ -2346,16 +2395,60 @@ export default function App() {
                         {documentVersions.map((version) => (
                           <details className="version-card" key={version.id}>
                             <summary>
-                              <strong>{version.label || version.title || "Documento sin título"}</strong>
-                              <time dateTime={version.capturedAt}>{new Date(version.capturedAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}</time>
+                              {editingVersionLabel === version.id ? (
+                                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                  <input
+                                    autoFocus
+                                      value={versionLabelDraft}
+                                        onChange={(event) => setVersionLabelDraft(event.target.value)}
+                                        onClick={(event) => event.preventDefault()}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") { event.preventDefault(); void saveVersionLabel(version); }
+                                          if (event.key === "Escape") { event.preventDefault(); setEditingVersionLabel(null); }
+                                        }}
+                                        style={{ flex: 1, fontSize: "11px", padding: "4px" }}
+                                    />
+                                    <button type="button" onClick={(event) => { event.preventDefault(); void saveVersionLabel(version); }}>✓</button>
+                                    <button type="button" onClick={(event) => { event.preventDefault(); setEditingVersionLabel(null); }}>✕</button>
+                                </div>
+                              ) : (
+                                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                  <strong style={{ flex: 1 }}>{version.label || version.title || "Documento sin título"}</strong>
+                                  <button
+                                    type="button"
+                                    title="Editar etiqueta"
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      setEditingVersionLabel(version.id);
+                                      setVersionLabelDraft(version.label ?? "");
+                                    }}
+                                  >✎</button>
+                                </div>
+                              )}
+                              <time dateTime={version.capturedAt}>
+                                {new Date(version.capturedAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}
+                              </time>
                             </summary>
-                            <div className="version-card-content">
-                              {version.note && <p>{version.note}</p>}
-                              <div className="version-preview">{version.text || "Versión vacía"}</div>
-                              <button className="version-restore-button" onClick={() => void restoreVersion(version)} disabled={saving}>Recuperar esta versión</button>
+                          <div className="version-card-content">
+                            {version.note && <p>{version.note}</p>}
+                            <div className="version-preview">{version.text || "Versión vacía"}</div>
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                              <button className="version-restore-button" onClick={() => void requestRestoreVersion(version)} disabled={saving}>
+                                Recuperar esta versión
+                              </button>
+                                {deletingVersionId === version.id ? (
+                              <>
+                                <span style={{ fontSize: "10px", color: "#9a5548" }}>¿Eliminar esta salvaguarda?</span>
+                                <button className="danger-button" onClick={() => void confirmDeleteVersion(version)}>Sí, eliminar</button>
+                                <button className="version-restore-button" onClick={() => setDeletingVersionId(null)}>Cancelar</button>
+                              </>
+                              ) : (
+                                <button className="danger-button" onClick={() => setDeletingVersionId(version.id)}>Eliminar</button>
+                              )}
                             </div>
-                          </details>
-                        ))}
+                          </div>
+                        </details>
+                      ))}
                       </div>
                     )}
                   </>
@@ -2419,5 +2512,57 @@ export default function App() {
         </div>
       </main>
     </div>
+    {blockingMessage && (
+      <div role="dialog" aria-modal="true" style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+        display: "grid", placeItems: "center", zIndex: 100
+      }}>
+        <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "520px", width: "90%" }}>
+          <h3 style={{ marginTop: 0 }}>No se puede eliminar esta salvaguarda</h3>
+          <p style={{ fontSize: "12px", color: "#6f7369", whiteSpace: "pre-wrap" }}>
+            {blockingMessage}
+          </p>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <button className="version-restore-button" onClick={() => setBlockingMessage(null)}>Cerrar</button>
+            <button className="danger-button" onClick={async () => {
+              const service = await getWorkspace();
+              await service.rejectVersionRelations(activeDocument!.id, blockingRelationIds);
+              setBlockingMessage(null);
+              setBlockingRelationIds([]);
+            }}>Marcar relaciones como rechazadas</button>
+          </div>
+        </div>
+      </div>
+    )}
+    {restoreTarget && (
+           <div role="dialog" aria-modal="true" style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+              display: "grid", placeItems: "center", zIndex: 100
+            }}>
+            <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%" }}>
+              <h3 style={{ marginTop: 0 }}>Recuperar «{restoreTarget.label || restoreTarget.title}»</h3>
+              <p style={{ fontSize: "12px", color: "#6f7369" }}>
+                Se restaurará el estado guardado el{" "}
+                {new Date(restoreTarget.capturedAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.
+              </p>
+              <p style={{ fontSize: "12px", color: "#6f7369" }}>
+                Antes de restaurar, el estado actual se guardará como una nueva salvaguarda. Si el estado actual ya coincide con una salvaguarda existente, no se creará una nueva.
+              </p>
+              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>Título de la nueva salvaguarda</label>
+              <input
+                value={restoreLabelDraft}
+                onChange={(event) => setRestoreLabelDraft(event.target.value)}
+                style={{ width: "100%", padding: "8px", marginBottom: "16px" }}
+              />
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <button className="version-restore-button" onClick={() => setPendingRestoreVersion(null)}>Cancelar</button>
+              <button className="primary-button" onClick={() => void confirmRestoreVersion()} disabled={saving}>
+                {saving ? "Restaurando…" : "Recuperar y guardar estado actual"}
+              </button>
+            </div>
+          </div>
+        </div>
+   )}
+   </> 
   );
 }

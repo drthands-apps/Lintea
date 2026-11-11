@@ -562,11 +562,25 @@ async updateProject(project: Project): Promise<void> {
     );
   }
 
-  async deleteDocumentVersion(versionId: Id): Promise<void> {
-    throw new Error("no implementado en SQLite");
+
+  async updateDocumentVersion(version: DocumentVersion): Promise<void> {
+    const result = await this.database.execute(
+      `UPDATE document_versions SET
+        label = ?, note = ?
+       WHERE id = ? AND documentId = ?`,
+      [version.label ?? null, version.note ?? null, version.id, version.documentId]
+    );
+    if (result.rowsAffected === 0) {
+      throw new Error("No se puede actualizar una versión que no existe.");
+    }
   }
   
-  
+  async deleteDocumentVersion(versionId: Id): Promise<void> {
+  await this.database.execute(
+    "DELETE FROM document_versions WHERE id = ?",
+    [versionId]
+  );
+}
 
   listTags(projectId: Id): Promise<Tag[]> {
     return this.database.select<Tag[]>(

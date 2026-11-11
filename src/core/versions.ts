@@ -569,6 +569,10 @@ export function canDeleteVersion(
     capturedAt: string;
     fromStateId: Id;
     toStateId: Id;
+    fromLabel?: string;
+    fromTitle?: string;
+    toLabel?: string;
+    toTitle?: string;
   }>;
 } {
   const target = versions.find((v) => v.id === stateId);
@@ -580,37 +584,52 @@ export function canDeleteVersion(
     };
   }
 
-  // Buscamos relaciones activas (no interrumpidas y no rechazadas)
-  const blockingRelations = relations.filter((r) => {
-    const touches = r.fromStateId === stateId || r.toStateId === stateId;
-    const isActive = !r.fromMissing && !r.toMissing && !r.rejected;
-    return touches && isActive;
-  }).map((r) => ({
-    id: r.id,
-    label: r.label,
-    capturedAt: r.capturedAt,
-    fromStateId: r.fromStateId,
-    toStateId: r.toStateId
-  }));
+  const versionsById = new Map(versions.map((v) => [v.id, v]));
+  const blockingRelations = relations
+    .filter((r) => {
+      const touches = r.fromStateId === stateId || r.toStateId === stateId;
+      const isActive = !r.fromMissing && !r.toMissing && !r.rejected;
+      return touches && isActive;
+    })
+    .map((r) => ({
+      id: r.id,
+      label: r.label,
+      capturedAt: r.capturedAt,
+      fromStateId: r.fromStateId,
+      toStateId: r.toStateId,
+      fromLabel: versionsById.get(r.fromStateId)?.label,
+      fromTitle: versionsById.get(r.fromStateId)?.title,
+      toLabel: versionsById.get(r.toStateId)?.label,
+      toTitle: versionsById.get(r.toStateId)?.title
+    }));
 
-  if (blockingRelations.length > 0) {
-    const describe = (rel: { label?: string; capturedAt: string }) => {
-      const date = new Date(rel.capturedAt);
-      const formatted = Number.isNaN(date.getTime())
-        ? rel.capturedAt
-        : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
-      return `«${rel.label ?? "Sin título"}» (${formatted})`;
-    };
-    
-    const names = blockingRelations.map(describe).join(", ");
-    return {
-      allowed: false,
-      reason: `No se puede eliminar el estado «${target.label ?? target.title}» porque interrumpiría las relaciones: ${names}. Elimina primero esas relaciones o márcalas como rechazadas.`,
-      blockingRelations
-    };
+  if (blockingRelations.length === 0) {
+    return { allowed: true, blockingRelations: [] };
   }
 
-  return { allowed: true, blockingRelations: [] };
+  const describe = (rel: typeof blockingRelations[number]) => {
+    const date = new Date(rel.capturedAt);
+    const formatted = Number.isNaN(date.getTime())
+      ? rel.capturedAt
+      : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+    if (rel.label) {
+      return `«${rel.label}» (${formatted})`;
+    }
+    const from = rel.fromLabel ?? rel.fromTitle ?? "sin título";
+    const to = rel.toLabel ?? rel.toTitle ?? "sin título";
+    return `«${from}» → «${to}» (${formatted})`;
+  };
+
+  const MAX_NOMBRADAS = 5;
+  const nombres = blockingRelations.slice(0, MAX_NOMBRADAS).map(describe).join(", ");
+  const restantes = blockingRelations.length - MAX_NOMBRADAS;
+  const suffix = restantes > 0 ? ` y ${restantes} más` : "";
+
+  return {
+    allowed: false,
+    reason: `No se puede eliminar «${target.label ?? target.title}» porque interrumpiría ${blockingRelations.length} relación${blockingRelations.length === 1 ? "" : "es"}: ${nombres}${suffix}. Marca esas relaciones como rechazadas o elimínalas primero.`,
+    blockingRelations
+  };
 }
 
 /**

@@ -113,6 +113,13 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     this.documents.set(document.id, { ...document, kind: document.kind ?? current.kind, order: document.order ?? current.order });
   }
 
+    async updateDocumentVersion(version: DocumentVersion): Promise<void> {
+    if (!this.versions.has(version.id)) {
+      throw new Error("No se puede actualizar una versión que no existe.");
+    }
+    this.versions.set(version.id, { ...version });
+  }
+
   async listKnowledgeEntities(projectId: Id): Promise<KnowledgeEntity[]> {
     return [...this.entities.values()].filter((item) => item.projectId === projectId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title)).map(copyEntity);
   }

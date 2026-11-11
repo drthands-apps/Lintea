@@ -25,6 +25,7 @@ export interface ProjectStorage {
   getDocument(documentId: Id): Promise<DocumentRecord | null>;
   createDocument(document: DocumentRecord): Promise<void>;
   updateDocument(document: DocumentRecord): Promise<void>;
+  updateDocumentVersion(version: DocumentVersion): Promise<void>;
   listKnowledgeEntities(projectId: Id): Promise<KnowledgeEntity[]>;
   createKnowledgeEntity(entity: KnowledgeEntity): Promise<void>;
   updateKnowledgeEntity(entity: KnowledgeEntity): Promise<void>;

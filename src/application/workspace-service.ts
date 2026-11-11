@@ -153,6 +153,30 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return updated;
   }
 
+  async updateDocumentVersionLabel(
+    documentId: Id,
+    versionId: Id,
+    label: string
+  ): Promise<DocumentVersion> {
+    const versions = await this.storage.listDocumentVersions(documentId);
+    const version = versions.find((v) => v.id === versionId);
+    if (!version) {
+      throw new Error("La versión solicitada no pertenece a este documento.");
+    }
+    const updated = { ...version, label: label.trim() || undefined };
+    await this.storage.updateDocumentVersion(updated);
+    return updated;
+  }
+
+  async rejectVersionRelations(documentId: Id, relationIds: Id[]): Promise<void> {
+    const relations = await this.storage.listVersionRelations(documentId);
+    for (const relation of relations) {
+      if (relationIds.includes(relation.id)) {
+        await this.storage.updateVersionRelation({ ...relation, rejected: true });
+      }
+    }
+  }
+
   async createKnowledgeEntity(input: {
     projectId: Id; kind: EntityKind; title: string; description?: string;
   }): Promise<KnowledgeEntity> {
@@ -644,16 +668,26 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return restored;
   }
 
-   async deleteDocumentVersion(
-    documentId: Id,
-    versionId: Id
-  ): Promise<void> {
+  async deleteDocumentVersion(documentId: Id, versionId: Id): Promise<void> {
     const versions = await this.storage.listDocumentVersions(documentId);
     const relations = await this.storage.listVersionRelations(documentId);
 
     const check = canDeleteVersion(versions, relations, versionId);
     if (!check.allowed) {
       throw new Error(check.reason);
+    }
+
+    // Marcar las relaciones que tocan esta versión como interrumpidas
+    for (const relation of relations) {
+      const touchesFrom = relation.fromStateId === versionId;
+      const touchesTo = relation.toStateId === versionId;
+      if (touchesFrom || touchesTo) {
+        await this.storage.updateVersionRelation({
+          ...relation,
+          fromMissing: touchesFrom ? true : relation.fromMissing,
+          toMissing: touchesTo ? true : relation.toMissing
+        });
+      }
     }
 
     await this.storage.deleteDocumentVersion(versionId);

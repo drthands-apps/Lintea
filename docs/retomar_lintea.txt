@@ -1,0 +1,59 @@
+LINTEA — Informe para retomar el proyecto
+
+Fecha de la última sesión: 11 de noviembre de 2026.
+Último commit: (pendiente de hacer en esta sesión).
+Repositorio: https://github.com/drthands-apps/Lintea, rama master.
+
+ESTADO ACTUAL
+
+- 138 tests en verde. npm run typecheck limpio.
+- La aplicación de escritorio (npx tauri dev) arranca y funciona.
+- Historial por deltas operativo en SQLite: guardar, restaurar, editar etiquetas y eliminar versiones.
+- Pruebas realizadas hoy: Bloque A (guardar y recuperar), Bloque B (persistencia tras cerrar y abrir), Bloque C (rama alternativa y vuelta a estados anteriores) y Bloque D (borrado seguro). Todo funciona.
+- El borrado de versiones marca las relaciones que la tocan como interrumpidas, y la UI permite eliminar versiones sin dependencias activas.
+
+LO QUE SE HA IMPLEMENTADO HOY
+
+1. SqliteProjectStorage.deleteDocumentVersion (antes era un stub, ahora borra de verdad).
+2. WorkspaceService.deleteDocumentVersion marca las relaciones como interrumpidas (fromMissing / toMissing) antes de borrar la versión.
+3. WorkspaceService.rejectVersionRelations permite marcar relaciones como rechazadas para desbloquear borrados.
+4. WorkspaceService.updateDocumentVersionLabel permite editar la etiqueta de una versión sin tocar fecha ni contenido.
+5. UI del historial:
+   - Botón de editar etiqueta (lápiz) en cada versión.
+   - Botón de eliminar (con confirmación inline y modal de error si hay dependencias).
+   - Modal de restauración con título editable para la nueva salvaguarda previa.
+6. canDeleteVersion ahora usa los extremos de la relación (labels actuales de las versiones) si la relación no tiene label, y limita a 5 las relaciones nombradas en el mensaje ("y N más").
+
+PENDIENTE INMEDIATO (para la próxima sesión)
+
+- Comprobar el flujo completo del borrado seguro con versiones que tienen ramas (A → B → C, borrar B).
+- Probar el Bloque E (coherencia tras borrar: cerrar y abrir la app, verificar que las versiones borradas no reaparecen y que las relaciones interrumpidas se muestran correctamente).
+- Refinar la UI del historial:
+  - Acordeón: solo una versión desplegada a la vez.
+  - Indicador de "dónde estoy" (etiqueta en la versión actual o grafo de líneas ferroviarias).
+  - Diferencias entre versiones (diff contra la anterior).
+  - Previsualización del texto sin restaurar (solo lectura).
+- Diálogo de restauración: añadir el campo de título editable ya está hecho; falta pulir el texto para que explique el flujo completo (qué se va a guardar, si ya existe un punto idéntico, etc.).
+
+PENDIENTE POSTERIOR (documento de pendientes)
+
+- Menú contextual de clic derecho para crear ficha y enlazarla al pasaje.
+- Fichas con imágenes (avatares, inspiración).
+- Tablero de conexiones (grafo visual de fragmentos e hilos argumentales).
+- Editor semántico WYSIWYG (fase 5).
+- Centralizar rutas (paths.ts) para preparar instalador vs portable.
+- Export/import LinteaZip (fase 4).
+- Restaurar la selección de skin de texto y de interfaz en la UI (se perdió al reescribir App.tsx).
+- Crear la sección de "Estructura" (guía literaria, hilos argumentales) y el editor de imágenes de fichas.
+
+CONVENCIONES DE TRABAJO
+
+- Tests primero, implementación después.
+- Commits pequeños y frecuentes, con mensaje claro.
+- npm run typecheck && npm test antes de cada commit.
+- PowerShell en Windows. Usar git --no-pager o $env:GIT_PAGER="cat" si el paginador molesta.
+- npx tauri dev para la app real; npm run dev para la web con almacenamiento en memoria.
+
+NOTA PERSONAL
+
+El usuario prefiere un ritmo pausado, con explicaciones claras y sin dar por hecho que el código está pegado o guardado. Ante cualquier duda de estado, pedir la salida de git status, npm test o npm run typecheck.
