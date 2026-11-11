@@ -33,7 +33,8 @@ import {
   reconstructVersion,
   canDeleteVersion,
   contentHash,
-  referenceHash
+  referenceHash,
+  rebaseOrphanChild
 } from "../core/versions.js";
 import type {
   CreateVersionInput,
@@ -668,31 +669,64 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return restored;
   }
 
-  async deleteDocumentVersion(documentId: Id, versionId: Id): Promise<void> {
+  async deleteDocumentVersion(
+    documentId: Id,
+    versionId: Id,
+    options: { force?: boolean } = {}
+  ): Promise<void> {
+    const document = await this.storage.getDocument(documentId);
+    if (!document) {
+      throw new Error("No se puede eliminar una versión de un documento que no existe.");
+    }
+
     const versions = await this.storage.listDocumentVersions(documentId);
     const relations = await this.storage.listVersionRelations(documentId);
 
-    const check = canDeleteVersion(versions, relations, versionId);
-    if (!check.allowed) {
-      throw new Error(check.reason);
+    const target = versions.find((v) => v.id === versionId);
+    if (!target) {
+      throw new Error("La versión solicitada no existe en el historial.");
     }
 
-    // Marcar las relaciones que tocan esta versión como interrumpidas
-    for (const relation of relations) {
-      const touchesFrom = relation.fromStateId === versionId;
-      const touchesTo = relation.toStateId === versionId;
-      if (touchesFrom || touchesTo) {
-        await this.storage.updateVersionRelation({
-          ...relation,
-          fromMissing: touchesFrom ? true : relation.fromMissing,
-          toMissing: touchesTo ? true : relation.toMissing
-        });
+    if (!options.force) {
+      const check = canDeleteVersion(versions, relations, versionId);
+      if (!check.allowed) {
+        throw new Error(check.reason);
       }
     }
 
+    // 1. Aislar el nodo: reconectar sus hijos directos antes de borrarlo.
+    const grandparent = target.baseStateId
+      ? versions.find((v) => v.id === target.baseStateId)
+      : undefined;
+    const children = versions.filter((v) => v.baseStateId === versionId);
+    for (const child of children) {
+      const rebased = rebaseOrphanChild(
+        versions,
+        target,
+        child,
+        grandparent,
+        document
+      );
+      await this.storage.updateDocumentVersion(rebased);
+    }
+
+    // 2. Marcar relaciones del historial como interrumpidas, salvo las
+    //    ya rechazadas (opción A: rejected excluye fromMissing/toMissing).
+    for (const relation of relations) {
+      const touchesFrom = relation.fromStateId === versionId;
+      const touchesTo = relation.toStateId === versionId;
+      if (!touchesFrom && !touchesTo) continue;
+      if (relation.rejected) continue;
+      await this.storage.updateVersionRelation({
+        ...relation,
+        fromMissing: touchesFrom ? true : relation.fromMissing,
+        toMissing: touchesTo ? true : relation.toMissing
+      });
+    }
+
+    // 3. Borrar la versión.
     await this.storage.deleteDocumentVersion(versionId);
   }
-
 
   async createTag(projectId: Id, inputName: string): Promise<Tag> {
     const name = inputName.trim().replace(/\s+/g, " ");

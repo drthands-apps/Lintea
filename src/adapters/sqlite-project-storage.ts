@@ -566,9 +566,32 @@ async updateProject(project: Project): Promise<void> {
   async updateDocumentVersion(version: DocumentVersion): Promise<void> {
     const result = await this.database.execute(
       `UPDATE document_versions SET
-        label = ?, note = ?
+        title = ?, text = ?, kind = ?, sortOrder = ?,
+        label = ?, note = ?,
+        pinned = ?, baseStateId = ?, baseMissing = ?, changes = ?,
+        contentHash = ?, referenceHash = ?,
+        relationIds = ?, tagAssignmentKeys = ?, authorNoteIds = ?, compositionEntryIds = ?
        WHERE id = ? AND documentId = ?`,
-      [version.label ?? null, version.note ?? null, version.id, version.documentId]
+      [
+        version.title,
+        version.text,
+        version.kind,
+        version.order,
+        version.label ?? null,
+        version.note ?? null,
+        version.pinned ? 1 : 0,
+        version.baseStateId ?? null,
+        version.baseMissing ? 1 : 0,
+        version.changes ? JSON.stringify(version.changes) : null,
+        version.contentHash ?? null,
+        version.referenceHash ?? null,
+        version.relationIds ? JSON.stringify(version.relationIds) : null,
+        version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
+        version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
+        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
+        version.id,
+        version.documentId
+      ]
     );
     if (result.rowsAffected === 0) {
       throw new Error("No se puede actualizar una versión que no existe.");

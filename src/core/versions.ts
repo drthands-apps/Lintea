@@ -163,6 +163,8 @@ function optionalText(value: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
+
+
 /**
  * Crea una fotografía del estado actual del documento.
  * No modifica el documento original.
@@ -239,7 +241,56 @@ export function restoreDocumentVersion(
     updatedAt: date.toISOString()
   };
 }
+/**
+ * Prepara un hijo huérfano para sobrevivir al borrado de su base.
+ *
+ * Estrategia conservadora: materializarlo como estado `pinned` con el
+ * contenido reconstruido completo. Es correcto y no pierde datos. La
+ * optimización por delta (fusionar `changes`) queda para más adelante;
+ * el modelo acepta materializar como pinned cuando conviene.
+ *
+ * `grandparent` no se usa en esta primera iteración, pero se mantiene en
+ * la firma para que la optimización futura no cambie los llamadores.
+ */
+export function rebaseOrphanChild(
+  versions: DocumentVersion[],
+  deleted: DocumentVersion,
+  child: DocumentVersion,
+  _grandparent: DocumentVersion | undefined,
+  currentDocument: import("./model.js").DocumentRecord
+): DocumentVersion {
+  const relations: VersionRelation[] = []; // no hace falta para reconstruir
+  const reconstructed = reconstructVersion(
+    versions,
+    relations,
+    child.id,
+    currentDocument
+  );
 
+  return {
+    ...child,
+    title: reconstructed.title,
+    text: reconstructed.text,
+    kind: reconstructed.kind,
+    order: reconstructed.order,
+    pinned: true,
+    baseStateId: undefined,
+    changes: undefined,
+    baseMissing: undefined,
+    contentHash: contentHash({
+      title: reconstructed.title,
+      text: reconstructed.text,
+      kind: reconstructed.kind,
+      order: reconstructed.order
+    }),
+    referenceHash: referenceHash({
+      relationIds: child.relationIds ?? [],
+      tagAssignmentKeys: child.tagAssignmentKeys ?? [],
+      authorNoteIds: child.authorNoteIds ?? [],
+      compositionEntryIds: child.compositionEntryIds ?? []
+    })
+  };
+}
 /**
  * Serialización canónica: claves ordenadas, sin espacios, arrays de IDs
  * ordenados. Dos estados con el mismo contenido producen la misma cadena.
@@ -419,8 +470,8 @@ export function reconstructVersion(
       projectId: target.projectId,
       title: target.title,
       text: target.text,
-      kind: "note", // Fallback; el kind no está en DocumentVersion
-      order: 0,     // Fallback; el order no está en DocumentVersion
+      kind: target.kind as DocumentState["kind"],
+      order: target.order,    
       relationIds: target.relationIds ?? [],
       tagAssignmentKeys: target.tagAssignmentKeys ?? [],
       authorNoteIds: target.authorNoteIds ?? [],
@@ -444,13 +495,14 @@ export function reconstructVersion(
   }
 
   // El estado inicial es la base (si es pinned, su contenido; si no, hay que reconstruirla también)
+    // El estado inicial es la base (si es pinned, su contenido; si no, hay que reconstruirla también)
   let currentState: DocumentState = {
     documentId: base.documentId,
     projectId: base.projectId,
     title: base.title,
     text: base.text,
-    kind: "note",
-    order: 0,
+    kind: base.kind as DocumentState["kind"],
+    order: base.order,
     relationIds: base.relationIds ?? [],
     tagAssignmentKeys: base.tagAssignmentKeys ?? [],
     authorNoteIds: base.authorNoteIds ?? [],
@@ -699,4 +751,5 @@ export function validateRelations(
       throw new Error("El historial contiene un ciclo en la cadena de relaciones.");
     }
   }
+  
 }
