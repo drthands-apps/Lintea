@@ -870,7 +870,11 @@ export default function App() {
       await service.updateDocument(activeDocument.id, {
         title: activeDocument.title, text: activeDocument.text
       });
-      const restored = await service.restoreDocumentVersion(activeDocument.id, pendingRestoreVersion.id);
+      const restored = await service.restoreDocumentVersion(
+        activeDocument.id,
+        pendingRestoreVersion.id,
+        { label: restoreLabelDraft }
+      );
       setDocuments((current) => current.map((item) => item.id === restored.id ? { ...item, ...restored } : item));
       setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
       setPendingRestoreVersion(null);

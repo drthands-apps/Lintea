@@ -615,7 +615,8 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
    */
    async restoreDocumentVersion(
     documentId: Id,
-    versionId: Id
+    versionId: Id,
+    options: { label?: string } = {}
   ): Promise<DocumentRecord> {
     const current = await this.storage.getDocument(documentId);
     if (!current) {
@@ -641,7 +642,7 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     // 2. Guardar el estado actual como una nueva versión antes de sobreescribirlo,
     // para no perder lo que había (esto crea una relación implícita).
     const currentVersion = await this.saveDocumentVersion(documentId, {
-      label: "Antes de restaurar"
+      label: options.label ?? "Antes de restaurar"
     });
 
     // 3. Escribir el estado reconstruido en el documento

@@ -75,3 +75,42 @@ describe("restauración de versiones con relaciones", () => {
     );
   });
 });
+  describe("restauración: etiqueta de la salvaguarda previa", () => {
+  it("restoreDocumentVersion guarda el estado actual con la etiqueta solicitada", async () => {
+    const { service } = createTestService();
+    const project = await service.createProject({ title: "P" });
+    const document = await service.createDocument({
+      projectId: project.id, title: "Borrador", text: "Estado A."
+    });
+    const first = await service.saveDocumentVersion(document.id);
+
+    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+
+    await service.restoreDocumentVersion(document.id, first.id, {
+      label: "Antes de volver a A (prueba)"
+    });
+
+    const versions = await service.listDocumentVersions(document.id);
+    const guard = versions.find((v) => v.label === "Antes de volver a A (prueba)");
+    expect(guard).toBeDefined();
+    expect(guard!.text).toBe("Estado B.");
+  });
+
+  it("sin etiqueta, restoreDocumentVersion usa el título por defecto", async () => {
+    const { service } = createTestService();
+    const project = await service.createProject({ title: "P" });
+    const document = await service.createDocument({
+      projectId: project.id, title: "Borrador", text: "Estado A."
+    });
+    const first = await service.saveDocumentVersion(document.id);
+
+    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+
+    await service.restoreDocumentVersion(document.id, first.id);
+
+    const versions = await service.listDocumentVersions(document.id);
+    const guard = versions.find((v) => v.label === "Antes de restaurar");
+    expect(guard).toBeDefined();
+    expect(guard!.text).toBe("Estado B.");
+  });
+});
