@@ -792,21 +792,79 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     if (assigned) await this.storage.assignTag(input);
     else await this.storage.unassignTag(input);
   }
-    private normalizeSourceUrl(url: string | undefined): string | undefined {
-  const trimmed = url?.trim() || undefined;
-  if (!trimmed) return undefined;
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    throw new Error("La dirección de la fuente no es válida.");
+
+  async currentStateMatchesVersion(documentId: Id, versionId: Id): Promise<boolean> {
+    const document = await this.storage.getDocument(documentId);
+    if (!document) return false;
+
+    const versions = await this.storage.listDocumentVersions(documentId);
+    const version = versions.find((v) => v.id === versionId);
+    if (!version) return false;
+
+    const projectId = document.projectId;
+    const [relations, tagAssignments, notes, composition] = await Promise.all([
+      this.storage.listRelations(projectId),
+      this.storage.listTagAssignments(projectId),
+      this.storage.listAuthorNotes(projectId),
+      document.kind === "fragment"
+        ? this.storage.listCompositionEntries(documentId)
+        : Promise.resolve([])
+    ]);
+
+    const relationIds = relations
+      .filter((r) =>
+        (r.fromId === documentId && (r.fromType === "document" || r.fromType === "fragment")) ||
+        (r.toId === documentId && (r.toType === "document" || r.toType === "fragment"))
+      )
+      .map((r) => r.id);
+
+    const tagAssignmentKeys = tagAssignments
+      .filter((t) => t.targetType === "document" && t.targetId === documentId)
+      .map((t) =>
+        `${t.tagId}:${t.targetType}:${t.targetId}${t.anchor ? `:${t.anchor.documentId}:${t.anchor.quote}:${t.anchor.prefix}:${t.anchor.suffix}` : ""}`
+      );
+
+    const authorNoteIds = notes
+      .filter((n) => n.targetId === documentId && n.targetType === "document")
+      .map((n) => n.id);
+
+    const compositionEntryIds = composition.map((c) => c.id);
+
+    const currentContentHash = contentHash({
+      title: document.title,
+      text: document.text,
+      kind: document.kind ?? "note",
+      order: document.order ?? 0
+    });
+
+    const currentReferenceHash = referenceHash({
+      relationIds,
+      tagAssignmentKeys,
+      authorNoteIds,
+      compositionEntryIds
+    });
+
+    return (
+      version.contentHash === currentContentHash &&
+      version.referenceHash === currentReferenceHash
+    );
   }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Los enlaces externos deben usar HTTP o HTTPS.");
+
+  private normalizeSourceUrl(url: string | undefined): string | undefined {
+    const trimmed = url?.trim() || undefined;
+    if (!trimmed) return undefined;
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      throw new Error("La dirección de la fuente no es válida.");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Los enlaces externos deben usar HTTP o HTTPS.");
+    }
+    return trimmed;
   }
-  return trimmed;
-}
-    listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
+  listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
     return this.storage.listVersionRelations(documentId);
   }
 }

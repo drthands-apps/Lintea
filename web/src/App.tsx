@@ -302,6 +302,7 @@ export default function App() {
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
   const [blockingRelationIds, setBlockingRelationIds] = useState<Id[]>([]);
   const [blockingVersionId, setBlockingVersionId] = useState<Id | null>(null);
+  const [blockingCurrentMatches, setBlockingCurrentMatches] = useState(false);
   const searchIndex = useMemo(() => buildProjectSearchIndex({
     documents, entities, sources, notes: authorNotes, tags, assignments: tagAssignments
   }), [documents, entities, sources, authorNotes, tags, tagAssignments]);
@@ -870,7 +871,7 @@ export default function App() {
       await service.updateDocument(activeDocument.id, {
         title: activeDocument.title, text: activeDocument.text
       });
-      const restored = await service.restoreDocumentVersion(
+             const restored = await service.restoreDocumentVersion(
         activeDocument.id,
         pendingRestoreVersion.id,
         { label: restoreLabelDraft }
@@ -898,6 +899,7 @@ export default function App() {
       setError(reason instanceof Error ? reason.message : "No se pudo editar la etiqueta.");
     }
   }
+  
   async function requestDeleteVersion(version: DocumentVersion) {
     if (!activeDocument) return;
     const service = await getWorkspace();
@@ -917,6 +919,9 @@ export default function App() {
       setBlockingMessage(check.reason ?? "Esta salvaguarda tiene relaciones activas.");
       setBlockingVersionId(version.id);
       setBlockingRelationIds(check.blockingRelations.map((r) => r.id));
+      setBlockingCurrentMatches(
+        await service.currentStateMatchesVersion(activeDocument.id, version.id)
+      );
     }
   }
   
@@ -930,6 +935,7 @@ export default function App() {
       setBlockingMessage(null);
       setBlockingVersionId(null);
       setBlockingRelationIds([]);
+      setBlockingCurrentMatches(false);
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo eliminar la versión.");
@@ -947,9 +953,35 @@ export default function App() {
       setBlockingMessage(null);
       setBlockingVersionId(null);
       setBlockingRelationIds([]);
+      setBlockingCurrentMatches(false);
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo eliminar la versión.");
+    }
+  }
+
+  async function saveThenDeleteVersion() {
+    if (!activeDocument || !blockingVersionId) return;
+    const versionId = blockingVersionId;
+    try {
+       const service = await getWorkspace();
+      const target = documentVersions.find((v) => v.id === versionId);
+      await service.updateDocument(activeDocument.id, {
+        title: activeDocument.title,
+        text: activeDocument.text
+      });
+      await service.saveDocumentVersion(activeDocument.id, {
+        label: `Antes de eliminar «${target?.label || target?.title || "salvaguarda"}»`
+      });
+      await service.deleteDocumentVersion(activeDocument.id, versionId, { force: true });
+      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      setBlockingMessage(null);
+      setBlockingVersionId(null);
+      setBlockingRelationIds([]);
+      setBlockingCurrentMatches(false);
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo guardar y eliminar.");
     }
   }
 
@@ -2556,8 +2588,18 @@ export default function App() {
             Eliminar es irreversible. Puedes rechazar las relaciones (quedarán marcadas como descartadas)
             o eliminar de todos modos (quedarán marcadas como interrumpidas).
           </p>
+         {blockingCurrentMatches && (
+          <p style={{ fontSize: "12px", color: "#9a5548" }}>
+            El estado actual del documento coincide con esta salvaguarda. Si la eliminas,
+            el documento quedará sin respaldo en el historial; si después guardas, se creará
+            una nueva salvaguarda con el mismo contenido.
+          </p>
+        )}
           <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
-            <button className="version-restore-button" onClick={() => { setBlockingMessage(null); setBlockingVersionId(null); setBlockingRelationIds([]); }}>Cancelar</button>
+            <button className="version-restore-button" onClick={() => { setBlockingMessage(null); setBlockingVersionId(null); setBlockingRelationIds([]); setBlockingCurrentMatches(false); }}>Cancelar</button>
+            {blockingCurrentMatches && (
+              <button className="version-restore-button" onClick={() => void saveThenDeleteVersion()}>Guardar estado actual y eliminar</button>
+            )}
             <button className="version-restore-button" onClick={() => void cleanDeleteVersion()}>Rechazar relaciones y eliminar</button>
             <button className="danger-button" onClick={() => void forceDeleteVersion()}>Eliminar de todos modos</button>
           </div>

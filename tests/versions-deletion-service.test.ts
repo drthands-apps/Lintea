@@ -235,3 +235,17 @@ describe("borrado de hoja", () => {
     expect(reconstructVersion(versions, [], A.id, document).text).toBe("v1");
   });
 });
+describe("coincidencia con el estado actual", () => {
+  it("currentStateMatchesVersion detecta coincidencia por contenido", async () => {
+    const { service, document, clock } = await setup();
+    const A = await checkpoint(service, clock, document.id, "v1", "A");
+    expect(await service.currentStateMatchesVersion(document.id, A.id)).toBe(true);
+  });
+
+  it("currentStateMatchesVersion no detecta coincidencia si el texto cambió", async () => {
+    const { service, document, clock } = await setup();
+    const A = await checkpoint(service, clock, document.id, "v1", "A");
+    await service.updateDocument(document.id, { text: "v1-modificado" });
+    expect(await service.currentStateMatchesVersion(document.id, A.id)).toBe(false);
+  });
+});
