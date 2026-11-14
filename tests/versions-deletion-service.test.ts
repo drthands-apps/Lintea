@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { MemoryProjectStorage } from "../src/core/memory-storage.js";
 import { WorkspaceService } from "../src/application/workspace-service.js";
-import {canDeleteVersion, reconstructVersion } from "../src/core/versions.js";
+import { reconstructVersion } from "../src/core/versions.js";
 import type { DocumentVersion } from "../src/core/versions.js";
 
-// ---------------------------------------------------------------------------
-// Helpers de servicio con reloj incremental (1 s por checkpoint)
-// ---------------------------------------------------------------------------
-
-function makeClock(start = Date.parse("2026-11-11T10:00:00.000Z")) {
+function makeClock(start = Date.parse("2026-11-14T10:00:00.000Z")) {
   let t = start;
   return {
     now: () => new Date(t),
@@ -21,13 +17,10 @@ async function setup() {
   const service = new WorkspaceService(storage, clock.now);
   const project = await service.createProject({ title: "Pruebas" });
   const document = await service.createDocument({
-    projectId: project.id,
-    title: "Doc",
-    text: "v0"
+    projectId: project.id, title: "Doc", text: "v0"
   });
   return { clock, storage, service, project, document };
 }
-
 async function checkpoint(
   service: WorkspaceService,
   clock: { tick: () => Date },
@@ -39,13 +32,9 @@ async function checkpoint(
   clock.tick();
   return service.saveDocumentVersion(docId, label ? { label } : {});
 }
-// ---------------------------------------------------------------------------
-// Borrado lineal A→B→C→D
-// ---------------------------------------------------------------------------
 
-describe("borrado lineal A→B→C→D", () => {
+describe("ocultar C en A→B→C→D", () => {
   async function linear() {
-    
     const ctx = await setup();
     const A = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v1", "A");
     const B = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v2", "B");
@@ -54,47 +43,46 @@ describe("borrado lineal A→B→C→D", () => {
     return { ...ctx, A, B, C, D };
   }
 
-  it("borrar C: D sigue reconstruible con su contenido", async () => {
-    const { service, storage, document, A, B, C, D } = await linear();
-    await service.deleteDocumentVersion(document.id, C.id, { force: true });
+  it("C oculta; D' reconstruible con su contenido", async () => {
+    const { service, storage, document, C, D } = await linear();
+    await service.deleteDocumentVersion(document.id, C.id);
 
-    const versions = await storage.listDocumentVersions(document.id);
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
     const relations = await storage.listVersionRelations(document.id);
-    expect(versions.some((v) => v.id === C.id)).toBe(false);
+    const c = all.find((v) => v.id === C.id)!;
+    expect(c.hidden).toBe(true);
 
-    const state = reconstructVersion(versions, relations, D.id, document);
-    expect(state.text).toBe("v4");
+    const d = all.find((v) => v.id === D.id)!;
+    expect(d.hidden).toBe(true);
+    const dPrime = all.find((v) => v.id === d.replacedBy)!;
+    expect(reconstructVersion(all, relations, dPrime.id, document).text).toBe("v4");
   });
 
-  it("borrar C: B intacto y reconstruible", async () => {
+  it("C oculta; B intacto y reconstruible", async () => {
     const { service, storage, document, B, C } = await linear();
-    await service.deleteDocumentVersion(document.id, C.id, { force: true });
+    await service.deleteDocumentVersion(document.id, C.id);
 
-
-    const versions = await storage.listDocumentVersions(document.id);
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
     const relations = await storage.listVersionRelations(document.id);
-    const state = reconstructVersion(versions, relations, B.id, document);
-    expect(state.text).toBe("v2");
+    expect(reconstructVersion(all, relations, B.id, document).text).toBe("v2");
   });
 
-  it("borrar C: relaciones B→C y C→D quedan interrumpidas", async () => {
-    const { service, storage, document, B, C, D } = await linear();
-    await service.deleteDocumentVersion(document.id, C.id, { force: true });
+  it("relaciones B→C y C→D permanecen sin missing", async () => {
+    const { service, storage, document, C } = await linear();
+    await service.deleteDocumentVersion(document.id, C.id);
 
     const relations = await storage.listVersionRelations(document.id);
     const intoC = relations.find((r) => r.toStateId === C.id);
     const outOfC = relations.find((r) => r.fromStateId === C.id);
-
-    if (intoC) expect(intoC.toMissing).toBe(true);
-    if (outOfC) expect(outOfC.fromMissing).toBe(true);
+    expect(intoC).toBeDefined();
+    expect(outOfC).toBeDefined();
+    expect(intoC!.toMissing).not.toBe(true);
+    expect(outOfC!.fromMissing).not.toBe(true);
   });
 });
-// ---------------------------------------------------------------------------
-// Rama A→B→C y A→D
-// ---------------------------------------------------------------------------
 
-describe("borrado con rama", () => {
-  it("borrar B: C re-basado, D intacto", async () => {
+describe("ocultar B con rama", () => {
+  it("C reconectado a A; D intacto y reconstruible (no es hijo directo)", async () => {
     const ctx = await setup();
     const { service, storage, document, clock } = ctx;
 
@@ -102,53 +90,50 @@ describe("borrado con rama", () => {
     const B = await checkpoint(service, clock, document.id, "v2", "B");
     const C = await checkpoint(service, clock, document.id, "v3", "C");
 
-    // Volver a B y abrir rama D
     await service.restoreDocumentVersion(document.id, B.id);
     const D = await checkpoint(service, clock, document.id, "v3-rama", "D");
 
-    await service.deleteDocumentVersion(document.id,  B.id, { force: true });
+    await service.deleteDocumentVersion(document.id, B.id);
 
-    const versions = await storage.listDocumentVersions(document.id);
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
     const relations = await storage.listVersionRelations(document.id);
 
-    const stateC = reconstructVersion(versions, relations, C.id, document);
-    expect(stateC.text).toBe("v3");
+    const c = all.find((v) => v.id === C.id)!;
+    expect(c.hidden).toBe(true);
+    expect(c.replacedBy).toBeDefined();
+    const cPrime = all.find((v) => v.id === c.replacedBy)!;
+    expect(cPrime.baseStateId).toBe(A.id);
+    expect(reconstructVersion(all, relations, cPrime.id, document).text).toBe("v3");
 
-    const stateD = reconstructVersion(versions, relations, D.id, document);
-    expect(stateD.text).toBe("v3-rama");
+    const d = all.find((v) => v.id === D.id)!;
+    expect(d.hidden).not.toBe(true);
+    expect(d.replacedBy).toBeUndefined();
+    expect(reconstructVersion(all, relations, D.id, document).text).toBe("v3-rama");
   });
 });
 
-// ---------------------------------------------------------------------------
-// Borrado de pinned raíz
-// ---------------------------------------------------------------------------
-
-describe("borrado de pinned raíz", () => {
-  it("los hijos delta se materializan como pinned", async () => {
+describe("ocultar pinned raíz", () => {
+  it("los hijos se materializan como pinned", async () => {
     const { service, storage, document, clock } = await setup();
     const A = await checkpoint(service, clock, document.id, "v1", "A");
     const B = await checkpoint(service, clock, document.id, "v2", "B");
 
-    await service.deleteDocumentVersion(document.id, A.id, { force: true });
+    await service.deleteDocumentVersion(document.id, A.id);
 
-    const versions = await storage.listDocumentVersions(document.id);
-    const b = versions.find((v) => v.id === B.id);
-    expect(b).toBeDefined();
-    expect(b!.pinned).toBe(true);
-    expect(b!.baseStateId).toBeUndefined();
-    expect(b!.changes).toBeUndefined();
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const b = all.find((v) => v.id === B.id)!;
+    expect(b.hidden).toBe(true);
+    const bPrime = all.find((v) => v.id === b.replacedBy)!;
+    expect(bPrime.pinned).toBe(true);
+    expect(bPrime.baseStateId).toBeUndefined();
 
-    const state = reconstructVersion(versions, [], B.id, document);
-    expect(state.text).toBe("v2");
+    const relations = await storage.listVersionRelations(document.id);
+    expect(reconstructVersion(all, relations, bPrime.id, document).text).toBe("v2");
   });
 });
 
-// ---------------------------------------------------------------------------
-// Grafo triangular
-// ---------------------------------------------------------------------------
-
 describe("grafo triangular", () => {
-  it("borrar A deja el grafo navegable", async () => {
+  it("ocultar A deja el grafo navegable", async () => {
     const { service, storage, document, clock } = await setup();
     const A = await checkpoint(service, clock, document.id, "v1", "A");
     const B = await checkpoint(service, clock, document.id, "v2", "B");
@@ -158,83 +143,81 @@ describe("grafo triangular", () => {
     const A2 = await checkpoint(service, clock, document.id, "v1-rama", "A2");
     const A3 = await checkpoint(service, clock, document.id, "v1-rama-2", "A3");
 
-    await service.deleteDocumentVersion(document.id, A.id, { force: true });
-
-    const versions = await storage.listDocumentVersions(document.id);
-    const relations = await storage.listVersionRelations(document.id);
-
-    // Todos los supervivientes siguen reconstruibles.
-    for (const v of versions) {
-      expect(() => reconstructVersion(versions, relations, v.id, document)).not.toThrow();
-    }
-    expect(reconstructVersion(versions, relations, B.id, document).text).toBe("v2");
-    expect(reconstructVersion(versions, relations, C.id, document).text).toBe("v3");
-    expect(reconstructVersion(versions, relations, A2.id, document).text).toBe("v1-rama");
-    expect(reconstructVersion(versions, relations, A3.id, document).text).toBe("v1-rama-2");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// force y clean
-// ---------------------------------------------------------------------------
-
-describe("force y clean", () => {
-  it("sin force, una relación activa bloquea el borrado", async () => {
-    const { service, document, clock } = await setup();
-    const A = await checkpoint(service, clock, document.id, "v1", "A");
-    await checkpoint(service, clock, document.id, "v2", "B");
-
-    await expect(service.deleteDocumentVersion(document.id, A.id)).rejects.toThrow();
-  });
-
-  it("force permite borrar con relaciones activas y las marca interrumpidas", async () => {
-    const { service, storage, document, clock } = await setup();
-    const A = await checkpoint(service, clock, document.id, "v1", "A");
-    await checkpoint(service, clock, document.id, "v2", "B");
-
-    await service.deleteDocumentVersion(document.id, A.id, { force: true });
-
-    const relations = await storage.listVersionRelations(document.id);
-    expect(relations.some((r) => r.fromStateId === A.id && r.fromMissing)).toBe(true);
-  });
-
-  it("clean (rechazar + borrar) deja relaciones rejected, no interrumpidas", async () => {
-    const { service, storage, document, clock } = await setup();
-    const A = await checkpoint(service, clock, document.id, "v1", "A");
-    await checkpoint(service, clock, document.id, "v2", "B");
-
-    const versions = await storage.listDocumentVersions(document.id);
-    const relations = await storage.listVersionRelations(document.id);
-    const check = canDeleteVersion(versions, relations, A.id);
-    expect(check.allowed).toBe(false);
-
-    const ids = check.blockingRelations.map((r) => r.id);
-    await service.rejectVersionRelations(document.id, ids);
     await service.deleteDocumentVersion(document.id, A.id);
 
-    const after = await storage.listVersionRelations(document.id);
-    expect(after.filter((r) => r.fromStateId === A.id).every((r) => r.rejected)).toBe(true);
-    expect(after.filter((r) => r.fromStateId === A.id).some((r) => r.fromMissing)).toBe(false);
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const relations = await storage.listVersionRelations(document.id);
+
+    for (const v of all) {
+      expect(() => reconstructVersion(all, relations, v.id, document)).not.toThrow();
+    }
+    expect(reconstructVersion(all, relations, B.id, document).text).toBe("v2");
+    expect(reconstructVersion(all, relations, C.id, document).text).toBe("v3");
+    expect(reconstructVersion(all, relations, A2.id, document).text).toBe("v1-rama");
+    expect(reconstructVersion(all, relations, A3.id, document).text).toBe("v1-rama-2");
   });
 });
 
-// ---------------------------------------------------------------------------
-// Borrado de hoja
-// ---------------------------------------------------------------------------
-
-describe("borrado de hoja", () => {
-  it("borrar la versión más reciente no requiere re-base", async () => {
+describe("ocultar con relaciones activas", () => {
+  it("ocultar no lanza y las relaciones permanecen", async () => {
     const { service, storage, document, clock } = await setup();
     const A = await checkpoint(service, clock, document.id, "v1", "A");
     const B = await checkpoint(service, clock, document.id, "v2", "B");
 
-    await service.deleteDocumentVersion(document.id, B.id, { force: true });
+    await service.deleteDocumentVersion(document.id, A.id);
 
-    const versions = await storage.listDocumentVersions(document.id);
-    expect(versions.some((v) => v.id === B.id)).toBe(false);
-    expect(reconstructVersion(versions, [], A.id, document).text).toBe("v1");
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const a = all.find((v) => v.id === A.id)!;
+    expect(a.hidden).toBe(true);
+
+    const relations = await storage.listVersionRelations(document.id);
+    const aToB = relations.find((r) => r.fromStateId === A.id && r.toStateId === B.id);
+    expect(aToB).toBeDefined();
+    expect(aToB!.fromMissing).not.toBe(true);
   });
 });
+
+describe("ocultar hoja", () => {
+  it("ocultar la versión más reciente no requiere reconexión", async () => {
+    const { service, storage, document, clock } = await setup();
+    const A = await checkpoint(service, clock, document.id, "v1", "A");
+    const B = await checkpoint(service, clock, document.id, "v2", "B");
+
+    await service.deleteDocumentVersion(document.id, B.id);
+
+    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const b = all.find((v) => v.id === B.id)!;
+    expect(b.hidden).toBe(true);
+    expect(b.replacedBy).toBeUndefined();
+    expect(reconstructVersion(all, [], A.id, document).text).toBe("v1");
+  });
+});
+
+describe("des-ocultar", () => {
+  it("unhideDocumentVersion vuelve a mostrar la versión", async () => {
+    const { service, storage, document, clock } = await setup();
+    const A = await checkpoint(service, clock, document.id, "v1", "A");
+    await service.deleteDocumentVersion(document.id, A.id);
+
+    const hidden = await storage.listDocumentVersions(document.id);
+    expect(hidden.some((v) => v.id === A.id)).toBe(false);
+
+    await service.unhideDocumentVersion(document.id, A.id);
+
+    const visible = await storage.listDocumentVersions(document.id);
+    expect(visible.some((v) => v.id === A.id)).toBe(true);
+    const a = visible.find((v) => v.id === A.id)!;
+    expect(a.hidden).not.toBe(true);
+    expect(a.hiddenAt).toBeUndefined();
+  });
+
+  it("des-ocultar es idempotente si ya está visible", async () => {
+    const { service, document, clock } = await setup();
+    const A = await checkpoint(service, clock, document.id, "v1", "A");
+    await expect(service.unhideDocumentVersion(document.id, A.id)).resolves.toBeUndefined();
+  });
+});
+
 describe("coincidencia con el estado actual", () => {
   it("currentStateMatchesVersion detecta coincidencia por contenido", async () => {
     const { service, document, clock } = await setup();

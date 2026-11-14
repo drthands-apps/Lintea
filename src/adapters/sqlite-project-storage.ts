@@ -609,8 +609,6 @@ async updateProject(project: Project): Promise<void> {
         version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
         version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
         version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
-        version.id,
-        version.documentId,
         version.hidden ? 1 : 0,
         version.hiddenAt ?? null,
         version.replacedBy ?? null,
@@ -619,10 +617,17 @@ async updateProject(project: Project): Promise<void> {
         version.documentId
       ]
     );
-    if (result.rowsAffected === 0) {
-      throw new Error("No se puede actualizar una versión que no existe.");
-    }
+    console.log("[updateDocumentVersion]", {
+      id: version.id,
+      documentId: version.documentId,
+      hidden: version.hidden,
+      replacedBy: version.replacedBy,
+      rowsAffected: result.rowsAffected
+    });
+  if (result.rowsAffected === 0) {
+    throw new Error("No se puede actualizar una versión que no existe.");
   }
+}
   
   async deleteDocumentVersion(versionId: Id): Promise<void> {
   await this.database.execute(

@@ -260,31 +260,47 @@ export function restoreDocumentVersion(
  * `grandparent` no se usa en esta primera iteración, pero se mantiene en
  * la firma para que la optimización futura no cambie los llamadores.
  */
+/**
+ * Crea una nueva versión a partir de un hijo huérfano, para reconectarlo
+ * a la base de su padre oculto. Estrategia delta-first: si el abuelo existe
+ * y se puede reconstruir el hijo, se calcula un delta `abuelo → hijo`.
+ * Si no, se materializa como pinned.
+ *
+ * No modifica el hijo original. El llamador debe marcar el hijo original
+ * con `hidden: true` y `replacedBy: nueva.id`.
+ */
 export function rebaseOrphanChild(
   versions: DocumentVersion[],
   deleted: DocumentVersion,
   child: DocumentVersion,
-  _grandparent: DocumentVersion | undefined,
-  currentDocument: import("./model.js").DocumentRecord
+  grandparent: DocumentVersion | undefined,
+  currentDocument: import("./model.js").DocumentRecord,
+  now: () => Date = () => new Date()
 ): DocumentVersion {
-  const relations: VersionRelation[] = []; // no hace falta para reconstruir
-  const reconstructed = reconstructVersion(
-    versions,
-    relations,
-    child.id,
-    currentDocument
-  );
+  const reconstructed = reconstructVersion(versions, [], child.id, currentDocument);
 
-  return {
-    ...child,
+  const baseState = grandparent
+    ? reconstructVersion(versions, [], grandparent.id, currentDocument)
+    : undefined;
+
+  const canDelta = Boolean(grandparent && !grandparent.hidden);
+
+  const common = {
+    id: createId(),
+    documentId: child.documentId,
+    projectId: child.projectId,
     title: reconstructed.title,
     text: reconstructed.text,
     kind: reconstructed.kind,
     order: reconstructed.order,
-    pinned: true,
-    baseStateId: undefined,
-    changes: undefined,
-    baseMissing: undefined,
+    capturedAt: now().toISOString(),
+    documentUpdatedAt: reconstructed.documentUpdatedAt,
+    label: child.label,
+    note: child.note,
+    relationIds: child.relationIds,
+    tagAssignmentKeys: child.tagAssignmentKeys,
+    authorNoteIds: child.authorNoteIds,
+    compositionEntryIds: child.compositionEntryIds,
     contentHash: contentHash({
       title: reconstructed.title,
       text: reconstructed.text,
@@ -297,6 +313,32 @@ export function rebaseOrphanChild(
       authorNoteIds: child.authorNoteIds ?? [],
       compositionEntryIds: child.compositionEntryIds ?? []
     })
+  };
+
+  if (canDelta && baseState && grandparent) {
+    const changes: DocumentChange[] = [
+      { kind: "title", from: baseState.title, to: reconstructed.title },
+      { kind: "text", from: baseState.text, to: reconstructed.text, hunks: [] },
+      { kind: "kind", from: baseState.kind, to: reconstructed.kind },
+      { kind: "order", from: baseState.order, to: reconstructed.order }
+    ].filter((c) => {
+      if (c.kind === "title" || c.kind === "text" || c.kind === "kind" || c.kind === "order") {
+        return c.from !== c.to;
+      }
+      return true;
+    }) as DocumentChange[];
+
+    return {
+      ...common,
+      pinned: false,
+      baseStateId: grandparent.id,
+      changes
+    };
+  }
+
+  return {
+    ...common,
+    pinned: true
   };
 }
 /**

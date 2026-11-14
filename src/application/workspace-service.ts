@@ -670,63 +670,79 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return restored;
   }
 
-  async deleteDocumentVersion(
-    documentId: Id,
-    versionId: Id,
-    options: { force?: boolean } = {}
-  ): Promise<void> {
+  async deleteDocumentVersion(documentId: Id, versionId: Id): Promise<void> {
     const document = await this.storage.getDocument(documentId);
     if (!document) {
-      throw new Error("No se puede eliminar una versión de un documento que no existe.");
+      throw new Error("No se puede ocultar una versión de un documento que no existe.");
     }
 
-    const versions = await this.storage.listDocumentVersions(documentId);
-    const relations = await this.storage.listVersionRelations(documentId);
-
+    const versions = await this.storage.listDocumentVersions(documentId, { includeHidden: true });
     const target = versions.find((v) => v.id === versionId);
     if (!target) {
       throw new Error("La versión solicitada no existe en el historial.");
     }
-
-    if (!options.force) {
-      const check = canDeleteVersion(versions, relations, versionId);
-      if (!check.allowed) {
-        throw new Error(check.reason);
-      }
+    if (target.hidden) {
+      return;
     }
 
-    // 1. Aislar el nodo: reconectar sus hijos directos antes de borrarlo.
+    const now = this.now().toISOString();
     const grandparent = target.baseStateId
       ? versions.find((v) => v.id === target.baseStateId)
       : undefined;
-    const children = versions.filter((v) => v.baseStateId === versionId);
+    const children = versions.filter((v) => v.baseStateId === versionId && !v.hidden);
+console.log("[delete] detalles", {
+  targetId: target.id,
+  targetDocumentId: target.documentId,
+  targetLabel: target.label,
+  targetBaseStateId: target.baseStateId,
+  targetHidden: target.hidden,
+  grandparentId: grandparent?.id,
+  childrenIds: children.map((c) => c.id),
+  childrenLabels: children.map((c) => c.label),
+  versionIdParam: versionId,
+  documentIdParam: documentId
+});
     for (const child of children) {
-      const rebased = rebaseOrphanChild(
-        versions,
-        target,
-        child,
-        grandparent,
-        document
-      );
-      await this.storage.updateDocumentVersion(rebased);
-    }
-
-    // 2. Marcar relaciones del historial como interrumpidas, salvo las
-    //    ya rechazadas (opción A: rejected excluye fromMissing/toMissing).
-    for (const relation of relations) {
-      const touchesFrom = relation.fromStateId === versionId;
-      const touchesTo = relation.toStateId === versionId;
-      if (!touchesFrom && !touchesTo) continue;
-      if (relation.rejected) continue;
-      await this.storage.updateVersionRelation({
-        ...relation,
-        fromMissing: touchesFrom ? true : relation.fromMissing,
-        toMissing: touchesTo ? true : relation.toMissing
+      const rebased = rebaseOrphanChild(versions, target, child, grandparent, document, this.now);
+      await this.storage.createDocumentVersion(rebased);
+      await this.storage.updateDocumentVersion({
+        ...child,
+        hidden: true,
+        hiddenAt: now,
+        replacedBy: rebased.id,
+        replacedAt: now
       });
+      if (grandparent) {
+        await this.storage.createVersionRelation({
+          id: createId(),
+          documentId,
+          projectId: document.projectId,
+          fromStateId: grandparent.id,
+          toStateId: rebased.id,
+          capturedAt: now,
+          label: `Reconectado tras ocultar «${target.label || target.title || "salvaguarda"}»`
+        });
+      }
     }
+    const existing = await this.storage.getDocumentVersion(versionId);
+    console.log("[delete] existing en BD", { found: Boolean(existing), id: existing?.id, documentId: existing?.documentId, hidden: existing?.hidden });
+    await this.storage.updateDocumentVersion({ ...target, hidden: true, hiddenAt: now });
+  }
 
-    // 3. Borrar la versión.
-    await this.storage.deleteDocumentVersion(versionId);
+  async unhideDocumentVersion(documentId: Id, versionId: Id): Promise<void> {
+    const versions = await this.storage.listDocumentVersions(documentId, { includeHidden: true });
+    const target = versions.find((v) => v.id === versionId);
+    if (!target) {
+      throw new Error("La versión solicitada no existe en el historial.");
+    }
+    if (!target.hidden) {
+      return;
+    }
+    await this.storage.updateDocumentVersion({
+      ...target,
+      hidden: undefined,
+      hiddenAt: undefined
+    });
   }
 
   async createTag(projectId: Id, inputName: string): Promise<Tag> {

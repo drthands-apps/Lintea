@@ -18,7 +18,6 @@ import type {
   TagTargetType
 } from "../../src/core/model.js";
 import { createId, relationKindLabels } from "../../src/core/model.js";
-
 import { MemoryProjectStorage } from "../../src/core/memory-storage.js";
 import { SqliteProjectStorage } from "../../src/adapters/sqlite-project-storage.js";
 import { WorkspaceService } from "../../src/application/workspace-service.js";
@@ -287,6 +286,7 @@ export default function App() {
   const [compositionEntries, setCompositionEntries] = useState<CompositionEntry[]>([]);
   const [fragmentChapterIds, setFragmentChapterIds] = useState<Id[]>([]);
   const [documentVersions, setDocumentVersions] = useState<DocumentVersion[]>([]);
+  const [showHiddenVersions, setShowHiddenVersions] = useState(false);
   const [versionLabel, setVersionLabel] = useState("");
   const [versionNote, setVersionNote] = useState("");
   const [editingVersionLabel, setEditingVersionLabel] = useState<Id | null>(null);
@@ -299,10 +299,13 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const activeDocument = documents.find((doc) => doc.id === activeId);
   const restoreTarget = pendingRestoreVersion;
-  const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
-  const [blockingRelationIds, setBlockingRelationIds] = useState<Id[]>([]);
-  const [blockingVersionId, setBlockingVersionId] = useState<Id | null>(null);
-  const [blockingCurrentMatches, setBlockingCurrentMatches] = useState(false);
+  const [showHideInfo, setShowHideInfo] = useState(false);
+  const [pendingHideAction, setPendingHideAction] = useState<
+    { kind: "hide"; version: DocumentVersion } | { kind: "unhide"; version: DocumentVersion } | null
+  >(null);
+  const [hideInfoDismissed, setHideInfoDismissed] = useState(
+    () => window.localStorage.getItem("lintea.hideInfoDismissed") === "1"
+  );
   const searchIndex = useMemo(() => buildProjectSearchIndex({
     documents, entities, sources, notes: authorNotes, tags, assignments: tagAssignments
   }), [documents, entities, sources, authorNotes, tags, tagAssignments]);
@@ -454,50 +457,22 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleEditorShortcuts);
   }, [activeDocument, activeView]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!activeDocument) {
-      setCompositionEntries([]);
-      setFragmentChapterIds([]);
-      return;
-    }
-    if (activeDocument.kind === "chapter") {
-      setFragmentChapterIds([]);
-      void getWorkspace().then((service) => service.listCompositionEntries(activeDocument.id))
-        .then((entries) => { if (!cancelled) setCompositionEntries(entries); })
-        .catch((reason: unknown) => {
-          if (!cancelled) setError(reason instanceof Error ? reason.message : "No se pudo cargar la composición.");
-        });
-    } else if (activeDocument.kind === "fragment") {
-      setCompositionEntries([]);
-      const chapters = documents.filter((item) => item.kind === "chapter");
-      void getWorkspace().then(async (service) => {
-        const entriesByChapter = await Promise.all(chapters.map((chapter) => service.listCompositionEntries(chapter.id)));
-        return chapters.filter((_, index) => entriesByChapter[index]?.some((entry) => entry.fragmentId === activeDocument.id)).map((chapter) => chapter.id);
-      }).then((chapterIds) => { if (!cancelled) setFragmentChapterIds(chapterIds); })
-        .catch((reason: unknown) => {
-          if (!cancelled) setError(reason instanceof Error ? reason.message : "No se pudieron consultar los capítulos vinculados.");
-        });
-    } else {
-      setCompositionEntries([]);
-      setFragmentChapterIds([]);
-    }
-    return () => { cancelled = true; };
-  }, [activeId, activeDocument?.kind]);
+ 
 
   useEffect(() => {
     let cancelled = false;
     setDocumentVersions([]);
     setVersionLabel("");
     setVersionNote("");
+
     if (!activeDocument || activeView !== "writing") return;
-    void getWorkspace().then((service) => service.listDocumentVersions(activeDocument.id))
+    void getWorkspace().then((service) => service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions }))
       .then((versions) => { if (!cancelled) setDocumentVersions(versions); })
       .catch((reason: unknown) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : "No se pudo cargar el historial.");
       });
     return () => { cancelled = true; };
-  }, [activeId, activeView]);
+  }, [activeId, activeView, showHiddenVersions]);
 
   useEffect(() => {
     if (!pendingTextAnchor || activeId !== pendingTextAnchor.documentId || activeView !== "writing") return;
@@ -846,7 +821,7 @@ export default function App() {
       });
       setDocuments((current) => current.map((item) => item.id === persisted.id ? { ...item, ...persisted } : item));
       await service.saveDocumentVersion(activeDocument.id, { label: versionLabel, note: versionNote });
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      await refreshVersions(service);
       setVersionLabel("");
       setVersionNote("");
       setError(null);
@@ -877,7 +852,7 @@ export default function App() {
         { label: restoreLabelDraft }
       );
       setDocuments((current) => current.map((item) => item.id === restored.id ? { ...item, ...restored } : item));
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      await refreshVersions(service);
       setPendingRestoreVersion(null);
       setRestoreLabelDraft("");
       setError(null);
@@ -887,12 +862,12 @@ export default function App() {
       setSaving(false);
     }
   }
-    async function saveVersionLabel(version: DocumentVersion) {
+  async function saveVersionLabel(version: DocumentVersion) {
     if (!activeDocument) return;
     try {
       const service = await getWorkspace();
       await service.updateDocumentVersionLabel(activeDocument.id, version.id, versionLabelDraft);
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
+      await refreshVersions(service);
       setEditingVersionLabel(null);
       setError(null);
     } catch (reason) {
@@ -900,89 +875,68 @@ export default function App() {
     }
   }
   
-  async function requestDeleteVersion(version: DocumentVersion) {
-    if (!activeDocument) return;
+async function requestHideVersion(version: DocumentVersion) {
+  if (hideInfoDismissed) {
+    await performHide(version);
+  } else {
+    setPendingHideAction({ kind: "hide", version });
+    setShowHideInfo(true);
+  }
+}
+
+async function requestUnhideVersion(version: DocumentVersion) {
+  if (hideInfoDismissed) {
+    await performUnhide(version);
+  } else {
+    setPendingHideAction({ kind: "unhide", version });
+    setShowHideInfo(true);
+  }
+}
+
+async function performHide(version: DocumentVersion) {
+  if (!activeDocument) return;
+  try {
     const service = await getWorkspace();
-    const versions = await service.listDocumentVersions(activeDocument.id);
-    const relations = await service.listVersionRelations(activeDocument.id);
-    const check = canDeleteVersion(versions, relations, version.id);
-    if (check.allowed) {
-      if (!window.confirm(`¿Eliminar la salvaguarda «${version.label || version.title || "sin título"}»?`)) return;
-      try {
-        await service.deleteDocumentVersion(activeDocument.id, version.id);
-        setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
-        setError(null);
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "No se pudo eliminar la versión.");
-      }
-    } else {
-      setBlockingMessage(check.reason ?? "Esta salvaguarda tiene relaciones activas.");
-      setBlockingVersionId(version.id);
-      setBlockingRelationIds(check.blockingRelations.map((r) => r.id));
-      setBlockingCurrentMatches(
-        await service.currentStateMatchesVersion(activeDocument.id, version.id)
-      );
-    }
+    await service.deleteDocumentVersion(activeDocument.id, version.id);
+    setDocumentVersions(await service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions }));
+    setError(null);
+  } catch (reason) {
+    setError(reason instanceof Error ? reason.message : "No se pudo ocultar la versión.");
   }
+}
+
+async function performUnhide(version: DocumentVersion) {
+  if (!activeDocument) return;
+  try {
+    const service = await getWorkspace();
+    await service.unhideDocumentVersion(activeDocument.id, version.id);
+    setDocumentVersions(await service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions }));
+    setError(null);
+  } catch (reason) {
+    setError(reason instanceof Error ? reason.message : "No se pudo mostrar la versión.");
+  }
+}
+
+async function confirmHideInfo() {
+  if (!pendingHideAction) return;
+  const action = pendingHideAction;
+  setShowHideInfo(false);
+  setPendingHideAction(null);
+  if (hideInfoDismissed) window.localStorage.setItem("lintea.hideInfoDismissed", "1");
+  else window.localStorage.removeItem("lintea.hideInfoDismissed");
+  if (action.kind === "hide") await performHide(action.version);
+  else await performUnhide(action.version);
+}
+
+
+
+
   
-  async function forceDeleteVersion() {
-    if (!activeDocument || !blockingVersionId) return;
-    const versionId = blockingVersionId;
-    try {
-      const service = await getWorkspace();
-      await service.deleteDocumentVersion(activeDocument.id, versionId, { force: true });
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
-      setBlockingMessage(null);
-      setBlockingVersionId(null);
-      setBlockingRelationIds([]);
-      setBlockingCurrentMatches(false);
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo eliminar la versión.");
-    }
-  }
-
-  async function cleanDeleteVersion() {
-    if (!activeDocument || !blockingVersionId) return;
-    const versionId = blockingVersionId;
-    try {
-      const service = await getWorkspace();
-      await service.rejectVersionRelations(activeDocument.id, blockingRelationIds);
-      await service.deleteDocumentVersion(activeDocument.id, versionId);
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
-      setBlockingMessage(null);
-      setBlockingVersionId(null);
-      setBlockingRelationIds([]);
-      setBlockingCurrentMatches(false);
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo eliminar la versión.");
-    }
-  }
-
-  async function saveThenDeleteVersion() {
-    if (!activeDocument || !blockingVersionId) return;
-    const versionId = blockingVersionId;
-    try {
-       const service = await getWorkspace();
-      const target = documentVersions.find((v) => v.id === versionId);
-      await service.updateDocument(activeDocument.id, {
-        title: activeDocument.title,
-        text: activeDocument.text
-      });
-      await service.saveDocumentVersion(activeDocument.id, {
-        label: `Antes de eliminar «${target?.label || target?.title || "salvaguarda"}»`
-      });
-      await service.deleteDocumentVersion(activeDocument.id, versionId, { force: true });
-      setDocumentVersions(await service.listDocumentVersions(activeDocument.id));
-      setBlockingMessage(null);
-      setBlockingVersionId(null);
-      setBlockingRelationIds([]);
-      setBlockingCurrentMatches(false);
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo guardar y eliminar.");
-    }
+async function refreshVersions(service: WorkspaceService) {
+    if (!activeDocument) return;
+    setDocumentVersions(
+      await service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions })
+    );
   }
 
   async function createDocument(kind: DocumentKind = "note") {
@@ -2453,7 +2407,16 @@ export default function App() {
                 {activeDocument && activeView === "writing" ? (
                   <>
                     <p className="muted-copy">Guarda un punto de recuperación antes de hacer cambios importantes. Al restaurar, el estado actual también se conserva.</p>
+                     <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", margin: "8px 0" }}>
+                        <input
+                          type="checkbox"
+                          checked={showHiddenVersions}
+                          onChange={(event) => setShowHiddenVersions(event.target.checked)}
+                        />
+                        Mostrar ocultas
+                      </label>
                     <form className="version-create-form" onSubmit={(event) => { event.preventDefault(); void saveVersion(); }}>
+                     
                       <input aria-label="Nombre de la versión" value={versionLabel} onChange={(event) => setVersionLabel(event.target.value)} placeholder="Nombre opcional, por ejemplo: Primer borrador" />
                       <textarea aria-label="Nota de la versión" value={versionNote} onChange={(event) => setVersionNote(event.target.value)} rows={2} placeholder="Nota para recordar qué cambió…" />
                       <button className="primary-button" type="submit" disabled={saving}>Guardar versión</button>
@@ -2484,6 +2447,16 @@ export default function App() {
                               ) : (
                                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                   <strong style={{ flex: 1 }}>{version.label || version.title || "Documento sin título"}</strong>
+                                  {version.pinned && (
+                                    <span title="Estado materializado (pinned)" style={{ fontSize: "10px", color: "#6f7369" }}>
+                                      📌
+                                    </span>
+                                  )}
+                                  {version.hidden && (
+                                    <span title="Oculta" style={{ fontSize: "10px", color: "#9a5548" }}>
+                                      (oculta{version.replacedBy ? ", reemplazada" : ""})
+                                    </span>
+                                  )}
                                   <button
                                     type="button"
                                     title="Editar etiqueta"
@@ -2506,7 +2479,11 @@ export default function App() {
                               <button className="version-restore-button" onClick={() => void requestRestoreVersion(version)} disabled={saving}>
                                 Recuperar esta versión
                               </button>
-                               <button className="danger-button" onClick={() => void requestDeleteVersion(version)}>Eliminar</button>
+                               {version.hidden ? (
+                                  <button className="version-restore-button" onClick={() => void requestUnhideVersion(version)}>Mostrar</button>
+                                ) : (
+                                  <button className="danger-button" onClick={() => void requestHideVersion(version)}>Ocultar</button>
+                                )}
                             </div>
                           </div>
                         </details>
@@ -2574,38 +2551,36 @@ export default function App() {
         </div>
       </main>
     </div>
-    {blockingMessage && (
-       <div role="dialog" aria-modal="true" style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-        display: "grid", placeItems: "center", zIndex: 100
-      }}>
-        <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "560px", width: "90%" }}>
-          <h3 style={{ marginTop: 0 }}>Esta salvaguarda tiene relaciones activas</h3>
-          <p style={{ fontSize: "12px", color: "#6f7369", whiteSpace: "pre-wrap" }}>
-            {blockingMessage}
-          </p>
-          <p style={{ fontSize: "12px", color: "#9a5548" }}>
-            Eliminar es irreversible. Puedes rechazar las relaciones (quedarán marcadas como descartadas)
-            o eliminar de todos modos (quedarán marcadas como interrumpidas).
-          </p>
-         {blockingCurrentMatches && (
-          <p style={{ fontSize: "12px", color: "#9a5548" }}>
-            El estado actual del documento coincide con esta salvaguarda. Si la eliminas,
-            el documento quedará sin respaldo en el historial; si después guardas, se creará
-            una nueva salvaguarda con el mismo contenido.
-          </p>
-        )}
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
-            <button className="version-restore-button" onClick={() => { setBlockingMessage(null); setBlockingVersionId(null); setBlockingRelationIds([]); setBlockingCurrentMatches(false); }}>Cancelar</button>
-            {blockingCurrentMatches && (
-              <button className="version-restore-button" onClick={() => void saveThenDeleteVersion()}>Guardar estado actual y eliminar</button>
-            )}
-            <button className="version-restore-button" onClick={() => void cleanDeleteVersion()}>Rechazar relaciones y eliminar</button>
-            <button className="danger-button" onClick={() => void forceDeleteVersion()}>Eliminar de todos modos</button>
-          </div>
-        </div>
+   {showHideInfo && pendingHideAction && (
+  <div role="dialog" aria-modal="true" style={{
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+    display: "grid", placeItems: "center", zIndex: 100
+  }}>
+    <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "520px", width: "90%" }}>
+      <h3 style={{ marginTop: 0 }}>
+        {pendingHideAction.kind === "hide" ? "Ocultar salvaguarda" : "Mostrar salvaguarda"}
+      </h3>
+      <p style={{ fontSize: "12px", color: "#6f7369" }}>
+        {pendingHideAction.kind === "hide"
+          ? "Ocultar una salvaguarda no la elimina: solo deja de mostrarse en el historial. Sus relaciones permanecen intactas. Puedes volver a mostrarla marcando «Mostrar ocultas» en el historial."
+          : "Mostrar una salvaguarda la hace visible de nuevo en el historial. Si fue reemplazada por otra, ambas quedarán visibles."}
+      </p>
+      <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", margin: "12px 0" }}>
+        <input
+          type="checkbox"
+          checked={hideInfoDismissed}
+          onChange={(event) => setHideInfoDismissed(event.target.checked)}
+        />
+        No volver a mostrar este aviso
+      </label>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="primary-button" onClick={() => void confirmHideInfo()}>
+          {pendingHideAction.kind === "hide" ? "Ocultar" : "Mostrar"}
+        </button>
       </div>
-    )}
+    </div>
+  </div>
+)}
     {restoreTarget && (
            <div role="dialog" aria-modal="true" style={{
               position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
