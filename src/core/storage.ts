@@ -46,7 +46,7 @@ export interface ProjectStorage {
   createAuthorNote(note: AuthorNote): Promise<void>;
   updateAuthorNote(note: AuthorNote): Promise<void>;
   deleteAuthorNote(projectId: Id, noteId: Id): Promise<void>;
-  listDocumentVersions(documentId: Id): Promise<DocumentVersion[]>;
+  listDocumentVersions(documentId: Id, options?: { includeHidden?: boolean }): Promise<DocumentVersion[]>;
   getDocumentVersion(versionId: Id): Promise<DocumentVersion | null>;
   createDocumentVersion(version: DocumentVersion): Promise<void>;
   deleteDocumentVersion(versionId: Id): Promise<void>;

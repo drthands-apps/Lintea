@@ -96,7 +96,11 @@ if (!projectColumns.some((column) => column.name === "context")) {
       ["relationIds", "TEXT"],
       ["tagAssignmentKeys", "TEXT"],
       ["authorNoteIds", "TEXT"],
-      ["compositionEntryIds", "TEXT"]
+      ["compositionEntryIds", "TEXT"],
+      ["hidden", "INTEGER NOT NULL DEFAULT 0"],
+      ["hiddenAt", "TEXT"],
+      ["replacedBy", "TEXT"],
+      ["replacedAt", "TEXT"]
     ];
     for (const [column, definition] of newVersionColumns) {
       if (!versionColumns.some((c) => c.name === column)) {
@@ -484,19 +488,24 @@ async updateProject(project: Project): Promise<void> {
     await this.database.execute("DELETE FROM author_notes WHERE projectId = ? AND id = ?", [projectId, noteId]);
   }
 
- async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
-  const rows = await this.database.select<any[]>(
-    `SELECT id, documentId, projectId, title, text, kind, sortOrder,
-            capturedAt, documentUpdatedAt, label, note,
-            pinned, baseStateId, baseMissing, changes,
-            contentHash, referenceHash,
-            relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds
-     FROM document_versions
-     WHERE documentId = ?
-     ORDER BY capturedAt DESC`,
-    [documentId]
-  );
-  return rows.map((row) => ({
+   async listDocumentVersions(
+    documentId: Id,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<DocumentVersion[]> {
+    const whereHidden = options.includeHidden ? "" : "AND hidden = 0";
+    const rows = await this.database.select<any[]>(
+      `SELECT id, documentId, projectId, title, text, kind, sortOrder,
+              capturedAt, documentUpdatedAt, label, note,
+              pinned, baseStateId, baseMissing, changes,
+              contentHash, referenceHash,
+              relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds,
+              hidden, hiddenAt, replacedBy, replacedAt
+       FROM document_versions
+       WHERE documentId = ? ${whereHidden}
+       ORDER BY capturedAt DESC`,
+      [documentId]
+    );
+     return rows.map((row) => ({
     id: row.id,
     documentId: row.documentId,
     projectId: row.projectId,
@@ -517,7 +526,11 @@ async updateProject(project: Project): Promise<void> {
     relationIds: row.relationIds ? JSON.parse(row.relationIds) : undefined,
     tagAssignmentKeys: row.tagAssignmentKeys ? JSON.parse(row.tagAssignmentKeys) : undefined,
     authorNoteIds: row.authorNoteIds ? JSON.parse(row.authorNoteIds) : undefined,
-    compositionEntryIds: row.compositionEntryIds ? JSON.parse(row.compositionEntryIds) : undefined
+    compositionEntryIds: row.compositionEntryIds ? JSON.parse(row.compositionEntryIds) : undefined,
+    hidden: row.hidden === 1 ? true : undefined,
+    hiddenAt: row.hiddenAt ?? undefined,
+    replacedBy: row.replacedBy ?? undefined,
+    replacedAt: row.replacedAt ?? undefined
   }));
 }
 
@@ -527,7 +540,8 @@ async updateProject(project: Project): Promise<void> {
             capturedAt, documentUpdatedAt, label, note,
             pinned, baseStateId, baseMissing, changes,
             contentHash, referenceHash,
-            relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds
+            relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds,
+            hidden, hiddenAt, replacedBy, replacedAt
       FROM document_versions WHERE id = ?`,
       [versionId]
     );
@@ -541,8 +555,9 @@ async updateProject(project: Project): Promise<void> {
         capturedAt, documentUpdatedAt, label, note,
         pinned, baseStateId, baseMissing, changes,
         contentHash, referenceHash,
-       relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds,
+        hidden, hiddenAt, replacedBy, replacedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         version.id, version.documentId, version.projectId,
         version.title, version.text, version.kind, version.order,
@@ -557,7 +572,11 @@ async updateProject(project: Project): Promise<void> {
         version.relationIds ? JSON.stringify(version.relationIds) : null,
         version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
         version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
-        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null
+        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
+        version.hidden ? 1 : 0,
+        version.hiddenAt ?? null,
+        version.replacedBy ?? null,
+        version.replacedAt ?? null
       ]
     );
   }
@@ -565,12 +584,13 @@ async updateProject(project: Project): Promise<void> {
 
   async updateDocumentVersion(version: DocumentVersion): Promise<void> {
     const result = await this.database.execute(
-      `UPDATE document_versions SET
+            `UPDATE document_versions SET
         title = ?, text = ?, kind = ?, sortOrder = ?,
         label = ?, note = ?,
         pinned = ?, baseStateId = ?, baseMissing = ?, changes = ?,
         contentHash = ?, referenceHash = ?,
-        relationIds = ?, tagAssignmentKeys = ?, authorNoteIds = ?, compositionEntryIds = ?
+        relationIds = ?, tagAssignmentKeys = ?, authorNoteIds = ?, compositionEntryIds = ?,
+        hidden = ?, hiddenAt = ?, replacedBy = ?, replacedAt = ?
        WHERE id = ? AND documentId = ?`,
       [
         version.title,
@@ -589,6 +609,12 @@ async updateProject(project: Project): Promise<void> {
         version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
         version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
         version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
+        version.id,
+        version.documentId,
+        version.hidden ? 1 : 0,
+        version.hiddenAt ?? null,
+        version.replacedBy ?? null,
+        version.replacedAt ?? null,
         version.id,
         version.documentId
       ]

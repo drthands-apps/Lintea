@@ -57,3 +57,16 @@ CONVENCIONES DE TRABAJO
 NOTA PERSONAL
 
 El usuario prefiere un ritmo pausado, con explicaciones claras y sin dar por hecho que el código está pegado o guardado. Ante cualquier duda de estado, pedir la salida de git status, npm test o npm run typecheck.
+Decisiones cerradas (13 nov):
+
+Inmutabilidad: versiones inmutables (modelo Git). El re-base crea nueva versión y marca la antigua con replacedBy/replacedAt. No se reescribe el contenido de una versión existente.
+
+Ubicaciones: appdata/roaming/org.lintea.desktop/ (temporales, autorecuperación, config, caché, logs, backups, estado de sesión); Documentos/Lintea/<proyecto>/ (.md consolidados + .lintea/lintea.db + exportaciones). Portable por copia de carpeta.
+
+Formato: Markdown + frontmatter YAML para almacenar; HTML + CSS para presentar (renderizado). El CSS es capa de presentación, no de almacenamiento.
+
+Edición externa: apertura por defecto; detección por hash; diálogo explícito con diff ("recargar / mantener / ver diferencias"); modo bloqueado opcional por proyecto (.lintea/lock, verificación de integridad); backups automáticos; sanitización al renderizar. Principio: el trabajo pertenece al autor; Lintea avisa, el autor decide; responsabilidad dividida.
+
+Apagón: autosave del temporal (cada N s / N cambios) + estado de sesión (sesion.json: proyecto, documento activo, vista, paneles) + autorecuperación al arrancar (detectar huérfanos, ofrecer restaurar sesión y cambios no consolidados).
+
+Plan inmediato (mañana): formalizar estas decisiones (15 min) y arrancar 2b (reconexión de deltas, pinned visible, borrado de relaciones rotas, con inmutabilidad: re-base crea nueva versión + replacedBy en la antigua; tests reescritos).

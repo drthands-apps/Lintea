@@ -266,9 +266,13 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     }
   }
 
-  async listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
+    async listDocumentVersions(
+    documentId: Id,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<DocumentVersion[]> {
     return [...this.versions.values()]
       .filter((version) => version.documentId === documentId)
+      .filter((version) => options.includeHidden || !version.hidden)
       .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
       .map((version) => ({ ...version }));
   }

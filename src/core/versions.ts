@@ -94,6 +94,14 @@ export interface DocumentVersion {
   documentUpdatedAt: string;
   label?: string;
   note?: string;
+  /** Si es true, la versión está oculta en la UI por defecto. No afecta a la lógica. */
+  hidden?: boolean;
+  /** Fecha en que se ocultó. */
+  hiddenAt?: string;
+  /** Si esta versión fue reemplazada por otra (reconexión), id de la nueva. */
+  replacedBy?: Id;
+  /** Fecha en que fue reemplazada. */
+  replacedAt?: string;
 
   /** Si es true, el estado se guarda íntegro y sirve como origen de rutas. */
   pinned?: boolean;

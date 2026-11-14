@@ -465,8 +465,8 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     return this.storage.deleteAuthorNote(projectId, noteId);
   }
 
-    listDocumentVersions(documentId: Id): Promise<DocumentVersion[]> {
-    return this.storage.listDocumentVersions(documentId);
+  listDocumentVersions(documentId: Id, options?: { includeHidden?: boolean }): Promise<DocumentVersion[]> {
+    return this.storage.listDocumentVersions(documentId, options);
   }
 
   /**
