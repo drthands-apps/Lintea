@@ -617,13 +617,7 @@ async updateProject(project: Project): Promise<void> {
         version.documentId
       ]
     );
-    console.log("[updateDocumentVersion]", {
-      id: version.id,
-      documentId: version.documentId,
-      hidden: version.hidden,
-      replacedBy: version.replacedBy,
-      rowsAffected: result.rowsAffected
-    });
+  
   if (result.rowsAffected === 0) {
     throw new Error("No se puede actualizar una versión que no existe.");
   }

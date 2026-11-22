@@ -100,22 +100,21 @@ async function loadProjectComposition(service: WorkspaceService, documents: Docu
 }
 
 
-let workspace: WorkspaceService | undefined;
+let workspacePromise: Promise<WorkspaceService> | undefined;
 
 async function getWorkspace(): Promise<WorkspaceService> {
-  if (!workspace) {
-    workspace = new WorkspaceService(await createStorage());
+  if (!workspacePromise) {
+    workspacePromise = createStorage().then((storage) => new WorkspaceService(storage));
   }
-
-  return workspace;
+  return workspacePromise;
 }
 
 async function createStorage(): Promise<ProjectStorage> {
-   console.log("[Lintea] Comprobando el entorno");
+
   if ("__TAURI_INTERNALS__" in window) {
     return SqliteProjectStorage.create();
   }
-  console.log("[Lintea] Usando almacenamiento en memoria");
+
   return new MemoryProjectStorage();
 }
 

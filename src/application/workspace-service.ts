@@ -690,18 +690,7 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
       ? versions.find((v) => v.id === target.baseStateId)
       : undefined;
     const children = versions.filter((v) => v.baseStateId === versionId && !v.hidden);
-console.log("[delete] detalles", {
-  targetId: target.id,
-  targetDocumentId: target.documentId,
-  targetLabel: target.label,
-  targetBaseStateId: target.baseStateId,
-  targetHidden: target.hidden,
-  grandparentId: grandparent?.id,
-  childrenIds: children.map((c) => c.id),
-  childrenLabels: children.map((c) => c.label),
-  versionIdParam: versionId,
-  documentIdParam: documentId
-});
+
     for (const child of children) {
       const rebased = rebaseOrphanChild(versions, target, child, grandparent, document, this.now);
       await this.storage.createDocumentVersion(rebased);
@@ -724,8 +713,7 @@ console.log("[delete] detalles", {
         });
       }
     }
-    const existing = await this.storage.getDocumentVersion(versionId);
-    console.log("[delete] existing en BD", { found: Boolean(existing), id: existing?.id, documentId: existing?.documentId, hidden: existing?.hidden });
+   
     await this.storage.updateDocumentVersion({ ...target, hidden: true, hiddenAt: now });
   }
 
