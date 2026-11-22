@@ -70,3 +70,4 @@ Edición externa: apertura por defecto; detección por hash; diálogo explícito
 Apagón: autosave del temporal (cada N s / N cambios) + estado de sesión (sesion.json: proyecto, documento activo, vista, paneles) + autorecuperación al arrancar (detectar huérfanos, ofrecer restaurar sesión y cambios no consolidados).
 
 Plan inmediato (mañana): formalizar estas decisiones (15 min) y arrancar 2b (reconexión de deltas, pinned visible, borrado de relaciones rotas, con inmutabilidad: re-base crea nueva versión + replacedBy en la antigua; tests reescritos).
+Sesión 14 nov (2b): cerrada. master en 6ec72e8. Modelo de ocultación implementado y validado. Bug de placeholders en updateDocumentVersion cazado y corregido. Pendiente: limpieza de logs de diagnóstico, actualización del informe, 2c (reconexión de relaciones no estructurales, des-ocultar con replacedBy, limpieza de BD), mejoras defensivas (singleton async, tests con SQLite real, placeholders nombrados).
