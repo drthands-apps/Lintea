@@ -78,3 +78,11 @@ Sesión 22 nov (ocultación sin reconexión): cerrada en working tree, pendiente
 - Pendiente inmediato: commit del cambio (feat(versions): ocultar sin reconexión…) + commit docs. El árbol tiene los cambios sin stagear; no cerrar el editor sin guardar.
 - Pendiente posterior: test de integración con SQLite real. SqliteProjectStorage depende de @tauri-apps/plugin-sql (Database.load), no instanciable en Vitest sin Tauri. Opciones: (A) extraer el adapter a una capa con Database inyectable + better-sqlite3 en tests; (B) script manual dentro de Tauri; (C) dejar como comprobación manual. Recomendación: A en sesión aparte, con commit propio.
 - Comprobación manual pendiente (Bloque E): en la app real, crear A→B→C→D, ocultar C, cerrar y abrir, verificar que C no aparece, D sí, y que las reconstrucciones funcionan.
+Sesión 23 nov (UI del historial y diff): master en 1fec966.
+- Acordeón: solo una versión desplegada a la vez (expandedVersionId).
+- Indicador "● Actual": la versión que coincide con el estado en pantalla (currentVersionId, vía currentStateMatchesVersion).
+- Diálogo de restauración aclarado: nombra la salvaguarda previa, avisa si coincide con la actual, pide verificar que el trabajo está salvaguardado.
+- Diff contra el estado actual en modal (react-diff-viewer-continued, fork mantenido con soporte React 19; licencia MIT). Cabecera fija con botón Cerrar; Escape cierra el modal.
+- Pendiente de salvaguardas: ventana de diff no bloqueante (panel flotante sin overlay, para copiar varios tramos al editor sin cerrar) o, alternativamente, modal arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas entre sí; historial visual (grafo de líneas).
+- Pendiente de fichas: el modelo (KnowledgeEntity) y el catálogo ya cubren personajes, lugares, acontecimientos, conceptos y otros; falta profundizar: menú contextual (clic derecho) para crear ficha y enlazarla al pasaje; imágenes/avatares (requiere migración de modelo + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
+- Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
