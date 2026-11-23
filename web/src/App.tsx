@@ -290,6 +290,8 @@ export default function App() {
   const [versionNote, setVersionNote] = useState("");
   const [editingVersionLabel, setEditingVersionLabel] = useState<Id | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<DocumentVersion | null>(null);
+  const [expandedVersionId, setExpandedVersionId] = useState<Id | null>(null);
+  const [currentVersionId, setCurrentVersionId] = useState<Id | null>(null);
   const [restoreLabelDraft, setRestoreLabelDraft] = useState("");
   const [versionLabelDraft, setVersionLabelDraft] = useState("");
   const [showNewDocumentMenu, setShowNewDocumentMenu] = useState(false);
@@ -461,12 +463,24 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setDocumentVersions([]);
+    setExpandedVersionId(null);
+    setCurrentVersionId(null);
     setVersionLabel("");
     setVersionNote("");
 
     if (!activeDocument || activeView !== "writing") return;
-    void getWorkspace().then((service) => service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions }))
-      .then((versions) => { if (!cancelled) setDocumentVersions(versions); })
+    void getWorkspace()
+      .then(async (service) => {
+        const versions = await service.listDocumentVersions(activeDocument.id, { includeHidden: showHiddenVersions });
+        if (cancelled) return;
+        setDocumentVersions(versions);
+        for (const version of versions) {
+          const matches = await service.currentStateMatchesVersion(activeDocument.id, version.id);
+          if (cancelled) return;
+          if (matches) { setCurrentVersionId(version.id); return; }
+        }
+        setCurrentVersionId(null);
+      })
       .catch((reason: unknown) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : "No se pudo cargar el historial.");
       });
@@ -2425,7 +2439,15 @@ async function refreshVersions(service: WorkspaceService) {
                     ) : (
                       <div className="version-list">
                         {documentVersions.map((version) => (
-                          <details className="version-card" key={version.id}>
+                          <details
+                            className="version-card"
+                            key={version.id}
+                            open={expandedVersionId === version.id}
+                            onToggle={(event) => {
+                              const isOpen = event.currentTarget.open;
+                              setExpandedVersionId(isOpen ? version.id : null);
+                            }}
+                          >
                             <summary>
                               {editingVersionLabel === version.id ? (
                                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -2446,6 +2468,14 @@ async function refreshVersions(service: WorkspaceService) {
                               ) : (
                                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                   <strong style={{ flex: 1 }}>{version.label || version.title || "Documento sin título"}</strong>
+                                  {currentVersionId === version.id && (
+                                    <span
+                                      title="Esta versión coincide con el estado actual del documento"
+                                      style={{ fontSize: "10px", color: "#4a6b4a", fontWeight: 600 }}
+                                    >
+                                      ● Actual
+                                    </span>
+                                  )}
                                   {version.pinned && (
                                     <span title="Estado materializado (pinned)" style={{ fontSize: "10px", color: "#6f7369" }}>
                                       📌
@@ -2472,6 +2502,9 @@ async function refreshVersions(service: WorkspaceService) {
                               </time>
                             </summary>
                           <div className="version-card-content">
+                            {currentVersionId === version.id && (
+                              <p className="field-hint">Esta es la versión que coincide con el estado guardado del documento.</p>
+                            )}
                             {version.note && <p>{version.note}</p>}
                             <div className="version-preview">{version.text || "Versión vacía"}</div>
                             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
