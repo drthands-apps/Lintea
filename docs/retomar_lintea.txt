@@ -71,3 +71,10 @@ Apagón: autosave del temporal (cada N s / N cambios) + estado de sesión (sesio
 
 Plan inmediato (mañana): formalizar estas decisiones (15 min) y arrancar 2b (reconexión de deltas, pinned visible, borrado de relaciones rotas, con inmutabilidad: re-base crea nueva versión + replacedBy en la antigua; tests reescritos).
 Sesión 14 nov (2b): cerrada. master en 6ec72e8. Modelo de ocultación implementado y validado. Bug de placeholders en updateDocumentVersion cazado y corregido. Pendiente: limpieza de logs de diagnóstico, actualización del informe, 2c (reconexión de relaciones no estructurales, des-ocultar con replacedBy, limpieza de BD), mejoras defensivas (singleton async, tests con SQLite real, placeholders nombrados).
+Sesión 22 nov (ocultación sin reconexión): cerrada en working tree, pendiente de commit.
+- deleteDocumentVersion solo marca hidden/hiddenAt; sin reconexión (rebaseOrphanChild/replacedBy fuera del flujo).
+- canDeleteVersion: allowed=true para versiones existentes; blockingRelations como info para la UI. Versión inexistente sigue en false.
+- Tests reescritos: versions-hide-reconnect (13) y versions-deletion-service (13). Suite: 169 en verde, typecheck limpio.
+- Pendiente inmediato: commit del cambio (feat(versions): ocultar sin reconexión…) + commit docs. El árbol tiene los cambios sin stagear; no cerrar el editor sin guardar.
+- Pendiente posterior: test de integración con SQLite real. SqliteProjectStorage depende de @tauri-apps/plugin-sql (Database.load), no instanciable en Vitest sin Tauri. Opciones: (A) extraer el adapter a una capa con Database inyectable + better-sqlite3 en tests; (B) script manual dentro de Tauri; (C) dejar como comprobación manual. Recomendación: A en sesión aparte, con commit propio.
+- Comprobación manual pendiente (Bloque E): en la app real, crear A→B→C→D, ocultar C, cerrar y abrir, verificar que C no aparece, D sí, y que las reconstrucciones funcionan.

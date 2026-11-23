@@ -159,7 +159,7 @@ describe("borrado lineal A→B→C→D", () => {
     const versions = await storage.listDocumentVersions(document.id);
     const relations = await storage.listVersionRelations(document.id);
     const check = canDeleteVersion(versions, relations, C.id);
-    expect(check.allowed).toBe(false);
+    expect(check.allowed).toBe(true);
 
     const ids = check.blockingRelations.map((r) => r.id);
     await service.rejectVersionRelations(document.id, ids);

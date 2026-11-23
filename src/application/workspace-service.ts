@@ -33,8 +33,7 @@ import {
   reconstructVersion,
   canDeleteVersion,
   contentHash,
-  referenceHash,
-  rebaseOrphanChild
+  referenceHash
 } from "../core/versions.js";
 import type {
   CreateVersionInput,
@@ -686,34 +685,6 @@ getDocument(documentId: Id): Promise<DocumentRecord | null> {
     }
 
     const now = this.now().toISOString();
-    const grandparent = target.baseStateId
-      ? versions.find((v) => v.id === target.baseStateId)
-      : undefined;
-    const children = versions.filter((v) => v.baseStateId === versionId && !v.hidden);
-
-    for (const child of children) {
-      const rebased = rebaseOrphanChild(versions, target, child, grandparent, document, this.now);
-      await this.storage.createDocumentVersion(rebased);
-      await this.storage.updateDocumentVersion({
-        ...child,
-        hidden: true,
-        hiddenAt: now,
-        replacedBy: rebased.id,
-        replacedAt: now
-      });
-      if (grandparent) {
-        await this.storage.createVersionRelation({
-          id: createId(),
-          documentId,
-          projectId: document.projectId,
-          fromStateId: grandparent.id,
-          toStateId: rebased.id,
-          capturedAt: now,
-          label: `Reconectado tras ocultar «${target.label || target.title || "salvaguarda"}»`
-        });
-      }
-    }
-   
     await this.storage.updateDocumentVersion({ ...target, hidden: true, hiddenAt: now });
   }
 

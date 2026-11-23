@@ -43,7 +43,7 @@ describe("ocultar C en A→B→C→D", () => {
     return { ...ctx, A, B, C, D };
   }
 
-  it("C oculta; D' reconstruible con su contenido", async () => {
+  it("C oculta; D intacto y reconstruible", async () => {
     const { service, storage, document, C, D } = await linear();
     await service.deleteDocumentVersion(document.id, C.id);
 
@@ -53,9 +53,9 @@ describe("ocultar C en A→B→C→D", () => {
     expect(c.hidden).toBe(true);
 
     const d = all.find((v) => v.id === D.id)!;
-    expect(d.hidden).toBe(true);
-    const dPrime = all.find((v) => v.id === d.replacedBy)!;
-    expect(reconstructVersion(all, relations, dPrime.id, document).text).toBe("v4");
+    expect(d.hidden).not.toBe(true);
+    expect(d.replacedBy).toBeUndefined();
+    expect(reconstructVersion(all, relations, D.id, document).text).toBe("v4");
   });
 
   it("C oculta; B intacto y reconstruible", async () => {
@@ -79,10 +79,18 @@ describe("ocultar C en A→B→C→D", () => {
     expect(intoC!.toMissing).not.toBe(true);
     expect(outOfC!.fromMissing).not.toBe(true);
   });
+
+  it("ocultar C no crea relaciones nuevas", async () => {
+    const { service, storage, document, C } = await linear();
+    const before = await storage.listVersionRelations(document.id);
+    await service.deleteDocumentVersion(document.id, C.id);
+    const after = await storage.listVersionRelations(document.id);
+    expect(after.length).toBe(before.length);
+  });
 });
 
 describe("ocultar B con rama", () => {
-  it("C reconectado a A; D intacto y reconstruible (no es hijo directo)", async () => {
+  it("B oculto; C y D intactos", async () => {
     const ctx = await setup();
     const { service, storage, document, clock } = ctx;
 
@@ -98,12 +106,14 @@ describe("ocultar B con rama", () => {
     const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
     const relations = await storage.listVersionRelations(document.id);
 
+    const b = all.find((v) => v.id === B.id)!;
+    expect(b.hidden).toBe(true);
+    expect(b.replacedBy).toBeUndefined();
+
     const c = all.find((v) => v.id === C.id)!;
-    expect(c.hidden).toBe(true);
-    expect(c.replacedBy).toBeDefined();
-    const cPrime = all.find((v) => v.id === c.replacedBy)!;
-    expect(cPrime.baseStateId).toBe(A.id);
-    expect(reconstructVersion(all, relations, cPrime.id, document).text).toBe("v3");
+    expect(c.hidden).not.toBe(true);
+    expect(c.replacedBy).toBeUndefined();
+    expect(reconstructVersion(all, relations, C.id, document).text).toBe("v3");
 
     const d = all.find((v) => v.id === D.id)!;
     expect(d.hidden).not.toBe(true);
@@ -113,7 +123,7 @@ describe("ocultar B con rama", () => {
 });
 
 describe("ocultar pinned raíz", () => {
-  it("los hijos se materializan como pinned", async () => {
+  it("ocultar A no materializa B", async () => {
     const { service, storage, document, clock } = await setup();
     const A = await checkpoint(service, clock, document.id, "v1", "A");
     const B = await checkpoint(service, clock, document.id, "v2", "B");
@@ -121,14 +131,15 @@ describe("ocultar pinned raíz", () => {
     await service.deleteDocumentVersion(document.id, A.id);
 
     const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const a = all.find((v) => v.id === A.id)!;
+    expect(a.hidden).toBe(true);
+
     const b = all.find((v) => v.id === B.id)!;
-    expect(b.hidden).toBe(true);
-    const bPrime = all.find((v) => v.id === b.replacedBy)!;
-    expect(bPrime.pinned).toBe(true);
-    expect(bPrime.baseStateId).toBeUndefined();
+    expect(b.hidden).not.toBe(true);
+    expect(b.replacedBy).toBeUndefined();
 
     const relations = await storage.listVersionRelations(document.id);
-    expect(reconstructVersion(all, relations, bPrime.id, document).text).toBe("v2");
+    expect(reconstructVersion(all, relations, B.id, document).text).toBe("v2");
   });
 });
 

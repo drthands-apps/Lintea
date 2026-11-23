@@ -656,7 +656,14 @@ export function computeReferenceStatus(
 
 
 /**
- * Determina si un estado puede ser eliminado sin romper el grafo.
+ * Informa sobre las relaciones activas que tocan un estado del historial.
+ *
+ * Ocultar una versión no borra nada ni interrumpe caminos: el grafo se conserva
+ * y las versiones ocultas siguen siendo reconstruibles con `includeHidden`.
+ * Por eso, para una versión existente, `allowed` es siempre `true`. Las
+ * `blockingRelations` se devuelven como información para que la UI pueda
+ * avisar al usuario de qué relaciones tocan la versión, no para impedir la
+ * operación.
  */
 export function canDeleteVersion(
   versions: DocumentVersion[],
@@ -705,33 +712,7 @@ export function canDeleteVersion(
       toTitle: versionsById.get(r.toStateId)?.title
     }));
 
-  if (blockingRelations.length === 0) {
-    return { allowed: true, blockingRelations: [] };
-  }
-
-  const describe = (rel: typeof blockingRelations[number]) => {
-    const date = new Date(rel.capturedAt);
-    const formatted = Number.isNaN(date.getTime())
-      ? rel.capturedAt
-      : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
-    if (rel.label) {
-      return `«${rel.label}» (${formatted})`;
-    }
-    const from = rel.fromLabel ?? rel.fromTitle ?? "sin título";
-    const to = rel.toLabel ?? rel.toTitle ?? "sin título";
-    return `«${from}» → «${to}» (${formatted})`;
-  };
-
-  const MAX_NOMBRADAS = 5;
-  const nombres = blockingRelations.slice(0, MAX_NOMBRADAS).map(describe).join(", ");
-  const restantes = blockingRelations.length - MAX_NOMBRADAS;
-  const suffix = restantes > 0 ? ` y ${restantes} más` : "";
-
-  return {
-    allowed: false,
-    reason: `No se puede eliminar «${target.label ?? target.title}» porque interrumpiría ${blockingRelations.length} relación${blockingRelations.length === 1 ? "" : "es"}: ${nombres}${suffix}. Marca esas relaciones como rechazadas o elimínalas primero.`,
-    blockingRelations
-  };
+  return { allowed: true, blockingRelations };
 }
 
 /**
