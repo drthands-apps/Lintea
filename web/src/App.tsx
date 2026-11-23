@@ -1,4 +1,5 @@
 
+import ReactDiffViewer from "react-diff-viewer-continued";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DocumentRecord,
@@ -290,6 +291,7 @@ export default function App() {
   const [versionNote, setVersionNote] = useState("");
   const [editingVersionLabel, setEditingVersionLabel] = useState<Id | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<DocumentVersion | null>(null);
+  const [diffVersion, setDiffVersion] = useState<DocumentVersion | null>(null);
   const [expandedVersionId, setExpandedVersionId] = useState<Id | null>(null);
   const [currentVersionId, setCurrentVersionId] = useState<Id | null>(null);
   const [restoreLabelDraft, setRestoreLabelDraft] = useState("");
@@ -440,6 +442,10 @@ export default function App() {
 
   useEffect(() => {
     function handleEditorShortcuts(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (diffVersion) { setDiffVersion(null); return; }
+        if (pendingRestoreVersion) { setPendingRestoreVersion(null); return; }
+      }
       const modifier = event.ctrlKey || event.metaKey;
       if (!modifier) return;
       const key = event.key.toLowerCase();
@@ -456,7 +462,7 @@ export default function App() {
     }
     window.addEventListener("keydown", handleEditorShortcuts);
     return () => window.removeEventListener("keydown", handleEditorShortcuts);
-  }, [activeDocument, activeView]);
+  }, [activeDocument, activeView, diffVersion, pendingRestoreVersion]);
 
  
 
@@ -2511,11 +2517,18 @@ async function refreshVersions(service: WorkspaceService) {
                               <button className="version-restore-button" onClick={() => void requestRestoreVersion(version)} disabled={saving}>
                                 Recuperar esta versión
                               </button>
-                               {version.hidden ? (
-                                  <button className="version-restore-button" onClick={() => void requestUnhideVersion(version)}>Mostrar</button>
-                                ) : (
-                                  <button className="danger-button" onClick={() => void requestHideVersion(version)}>Ocultar</button>
-                                )}
+                              <button
+                                className="version-restore-button"
+                                onClick={() => setDiffVersion(version)}
+                                disabled={!activeDocument}
+                              >
+                                Ver cambios
+                              </button>
+                              {version.hidden ? (
+                                <button className="version-restore-button" onClick={() => void requestUnhideVersion(version)}>Mostrar</button>
+                              ) : (
+                                <button className="danger-button" onClick={() => void requestHideVersion(version)}>Ocultar</button>
+                              )}
                             </div>
                           </div>
                         </details>
@@ -2583,69 +2596,123 @@ async function refreshVersions(service: WorkspaceService) {
         </div>
       </main>
     </div>
-   {showHideInfo && pendingHideAction && (
-  <div role="dialog" aria-modal="true" style={{
-    position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-    display: "grid", placeItems: "center", zIndex: 100
-  }}>
-    <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "520px", width: "90%" }}>
-      <h3 style={{ marginTop: 0 }}>
-        {pendingHideAction.kind === "hide" ? "Ocultar salvaguarda" : "Mostrar salvaguarda"}
-      </h3>
-      <p style={{ fontSize: "12px", color: "#6f7369" }}>
-        {pendingHideAction.kind === "hide"
-          ? "Ocultar una salvaguarda no la elimina: solo deja de mostrarse en el historial. Sus relaciones permanecen intactas. Puedes volver a mostrarla marcando «Mostrar ocultas» en el historial."
-          : "Mostrar una salvaguarda la hace visible de nuevo en el historial. Si fue reemplazada por otra, ambas quedarán visibles."}
-      </p>
-      <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", margin: "12px 0" }}>
-        <input
-          type="checkbox"
-          checked={hideInfoDismissed}
-          onChange={(event) => setHideInfoDismissed(event.target.checked)}
-        />
-        No volver a mostrar este aviso
-      </label>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="primary-button" onClick={() => void confirmHideInfo()}>
-          {pendingHideAction.kind === "hide" ? "Ocultar" : "Mostrar"}
+  {showHideInfo && pendingHideAction && (
+    <div role="dialog" aria-modal="true" style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+      display: "grid", placeItems: "center", zIndex: 100
+    }}>
+      <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "520px", width: "90%" }}>
+        <h3 style={{ marginTop: 0 }}>
+          {pendingHideAction.kind === "hide" ? "Ocultar salvaguarda" : "Mostrar salvaguarda"}
+        </h3>
+        <p style={{ fontSize: "12px", color: "#6f7369" }}>
+          {pendingHideAction.kind === "hide"
+            ? "Ocultar una salvaguarda no la elimina: solo deja de mostrarse en el historial. Sus relaciones permanecen intactas. Puedes volver a mostrarla marcando «Mostrar ocultas» en el historial."
+            : "Mostrar una salvaguarda la hace visible de nuevo en el historial. Si fue reemplazada por otra, ambas quedarán visibles."}
+        </p>
+        <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", margin: "12px 0" }}>
+          <input
+            type="checkbox"
+            checked={hideInfoDismissed}
+            onChange={(event) => setHideInfoDismissed(event.target.checked)}
+          />
+            No volver a mostrar este aviso
+         </label>
+         <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button className="primary-button" onClick={() => void confirmHideInfo()}>
+            {pendingHideAction.kind === "hide" ? "Ocultar" : "Mostrar"}
+          </button>
+         </div>
+      </div>
+    </div>
+  )}
+  {diffVersion && activeDocument && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+      display: "grid", placeItems: "center", zIndex: 100
+    }}
+  >
+    <div style={{
+      background: "#fbfaf6", borderRadius: "12px",
+      maxWidth: "90vw", width: "90vw", maxHeight: "90vh",
+      display: "flex", flexDirection: "column", overflow: "hidden"
+    }}>
+      {/* Cabecera fija con título y botón de cerrar */}
+      <div style={{
+        display: "flex", alignItems: "flex-start", gap: "12px",
+        padding: "16px 24px", borderBottom: "1px solid #e3e1d8",
+        background: "#fbfaf6", position: "sticky", top: 0, zIndex: 1
+      }}>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ margin: 0 }}>
+            Cambios entre «{diffVersion.label || diffVersion.title || "salvaguarda"}» y el estado actual
+          </h3>
+          <p style={{ fontSize: "12px", color: "#6f7369", margin: "4px 0 0" }}>
+            Izquierda: la salvaguarda guardada el{" "}
+            {new Date(diffVersion.capturedAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.
+            Derecha: el estado que tienes ahora en pantalla.
+          </p>
+        </div>
+        <button
+          className="version-restore-button"
+          onClick={() => setDiffVersion(null)}
+          aria-label="Cerrar comparación"
+          title="Cerrar (Esc)"
+        >
+          ✕ Cerrar
         </button>
+      </div>
+
+      {/* Contenido con scroll propio */}
+      <div style={{ overflow: "auto", padding: "16px 24px", flex: 1 }}>
+        <ReactDiffViewer
+          oldValue={diffVersion.text}
+          newValue={activeDocument.text}
+          splitView={true}
+          leftTitle="Salvaguarda"
+          rightTitle="Estado actual"
+          useDarkTheme={false}
+        />
       </div>
     </div>
   </div>
 )}
-    {restoreTarget && (
-           <div role="dialog" aria-modal="true" style={{
-              position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-              display: "grid", placeItems: "center", zIndex: 100
-            }}>
-            <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%" }}>
-              <h3 style={{ marginTop: 0 }}>Recuperar «{restoreTarget.label || restoreTarget.title || "salvaguarda"}»</h3>
-              <p style={{ fontSize: "12px", color: "#6f7369" }}>
-                Se recuperará el estado guardado el{" "}
-                {new Date(restoreTarget.capturedAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.
-              </p>
-              <p style={{ fontSize: "12px", color: "#6f7369" }}>
-                Antes de recuperar, el estado actual se guardará como una nueva salvaguarda titulada{" "}
-                <strong>«{restoreLabelDraft.trim() || "Sin título"}»</strong>.
-                {currentVersionId === restoreTarget.id
-                  ? " El estado actual ya coincide con esta salvaguarda: no se creará una nueva."
-                  : " El historial no se borra: podrás volver a cualquiera de las dos versiones."}
-              </p>
-              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>Título de la nueva salvaguarda</label>
-              <input
-                value={restoreLabelDraft}
-                onChange={(event) => setRestoreLabelDraft(event.target.value)}
-                style={{ width: "100%", padding: "8px", marginBottom: "16px" }}
-              />
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              <button className="version-restore-button" onClick={() => setPendingRestoreVersion(null)}>Cancelar</button>
-              <button className="primary-button" onClick={() => void confirmRestoreVersion()} disabled={saving}>
-                {saving ? "Restaurando…" : "Recuperar y guardar estado actual"}
-              </button>
-            </div>
+  {restoreTarget && (
+    <div role="dialog" aria-modal="true" style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+      display: "grid", placeItems: "center", zIndex: 100
+    }}>
+      <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%" }}>
+        <h3 style={{ marginTop: 0 }}>Recuperar «{restoreTarget.label || restoreTarget.title || "salvaguarda"}»</h3>
+        <p style={{ fontSize: "12px", color: "#6f7369" }}>
+          Se recuperará el estado guardado el{" "}
+          {new Date(restoreTarget.capturedAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.
+        </p>
+        <p style={{ fontSize: "12px", color: "#6f7369" }}>
+          Antes de recuperar, el estado actual se guardará como una nueva salvaguarda titulada{" "}
+            <strong>«{restoreLabelDraft.trim() || "Sin título"}»</strong>.
+            {currentVersionId === restoreTarget.id
+            ? " El estado actual ya coincide con esta salvaguarda: no se creará una nueva."
+            : " El historial no se borra: podrás volver a cualquiera de las dos versiones."}
+        </p>
+        <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>Título de la nueva salvaguarda</label>
+        <input
+          value={restoreLabelDraft}
+          onChange={(event) => setRestoreLabelDraft(event.target.value)}
+          style={{ width: "100%", padding: "8px", marginBottom: "16px" }}
+        />
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <button className="version-restore-button" onClick={() => setPendingRestoreVersion(null)}>Cancelar</button>
+            <button className="primary-button" onClick={() => void confirmRestoreVersion()} disabled={saving}>
+              {saving ? "Restaurando…" : "Recuperar y guardar estado actual"}
+            </button>
           </div>
-        </div>
-   )}
-   </> 
+      </div>
+    </div>
+  )}
+  </> 
   );
 }
