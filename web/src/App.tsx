@@ -2619,13 +2619,17 @@ async function refreshVersions(service: WorkspaceService) {
               display: "grid", placeItems: "center", zIndex: 100
             }}>
             <div style={{ background: "#fbfaf6", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%" }}>
-              <h3 style={{ marginTop: 0 }}>Recuperar «{restoreTarget.label || restoreTarget.title}»</h3>
+              <h3 style={{ marginTop: 0 }}>Recuperar «{restoreTarget.label || restoreTarget.title || "salvaguarda"}»</h3>
               <p style={{ fontSize: "12px", color: "#6f7369" }}>
-                Se restaurará el estado guardado el{" "}
+                Se recuperará el estado guardado el{" "}
                 {new Date(restoreTarget.capturedAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.
               </p>
               <p style={{ fontSize: "12px", color: "#6f7369" }}>
-                Antes de restaurar, el estado actual se guardará como una nueva salvaguarda. Si el estado actual ya coincide con una salvaguarda existente, no se creará una nueva.
+                Antes de recuperar, el estado actual se guardará como una nueva salvaguarda titulada{" "}
+                <strong>«{restoreLabelDraft.trim() || "Sin título"}»</strong>.
+                {currentVersionId === restoreTarget.id
+                  ? " El estado actual ya coincide con esta salvaguarda: no se creará una nueva."
+                  : " El historial no se borra: podrás volver a cualquiera de las dos versiones."}
               </p>
               <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>Título de la nueva salvaguarda</label>
               <input
