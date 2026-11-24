@@ -86,3 +86,14 @@ Sesión 23 nov (UI del historial y diff): master en 1fec966.
 - Pendiente de salvaguardas: ventana de diff no bloqueante (panel flotante sin overlay, para copiar varios tramos al editor sin cerrar) o, alternativamente, modal arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas entre sí; historial visual (grafo de líneas).
 - Pendiente de fichas: el modelo (KnowledgeEntity) y el catálogo ya cubren personajes, lugares, acontecimientos, conceptos y otros; falta profundizar: menú contextual (clic derecho) para crear ficha y enlazarla al pasaje; imágenes/avatares (requiere migración de modelo + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
 - Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
+Sesión 24 nov (menú contextual de fichas): master en 6771fa3.
+- Clic derecho en el editor con texto seleccionado abre un menú contextual:
+  - Crear ficha (personaje, lugar, acontecimiento, concepto, otro) y enlazarla al pasaje con anchor.
+  - Enlazar ficha existente al pasaje.
+  - Enlazar fuente existente al pasaje (si hay fuentes).
+- Tras crear una ficha, se abre el catálogo con la ficha seleccionada para completarla.
+- Cierre del menú con clic fuera y Escape; sin selección, menú nativo del navegador.
+- Sin migración de modelo: usa KnowledgeEntity y Relation con anchor existentes.
+- Pendiente de fichas: imágenes/avatares (requiere migración + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
+- Pendiente de salvaguardas: ventana de diff no bloqueante/arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas; historial visual.
+- Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
