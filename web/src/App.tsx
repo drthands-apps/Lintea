@@ -292,6 +292,8 @@ export default function App() {
   const [editingVersionLabel, setEditingVersionLabel] = useState<Id | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<DocumentVersion | null>(null);
   const [diffVersion, setDiffVersion] = useState<DocumentVersion | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; quote: string } | null>(null);
+  const [contextMenuView, setContextMenuView] = useState<"root" | "create" | "linkEntity" | "linkSource">("root");
   const [expandedVersionId, setExpandedVersionId] = useState<Id | null>(null);
   const [currentVersionId, setCurrentVersionId] = useState<Id | null>(null);
   const [restoreLabelDraft, setRestoreLabelDraft] = useState("");
@@ -426,6 +428,16 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!contextMenu) return;
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".editor-context-menu")) closeContextMenu();
+    }
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, [contextMenu]);
+
+  useEffect(() => {
     const linkedToActive = (type: "entity" | "source") => Boolean(activeDocument && relations.some((relation) =>
       (relation.fromType === "document" && relation.fromId === activeDocument.id && relation.toType === type) ||
       (relation.toType === "document" && relation.toId === activeDocument.id && relation.fromType === type)
@@ -443,6 +455,7 @@ export default function App() {
   useEffect(() => {
     function handleEditorShortcuts(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (contextMenu) { closeContextMenu(); return; }
         if (diffVersion) { setDiffVersion(null); return; }
         if (pendingRestoreVersion) { setPendingRestoreVersion(null); return; }
       }
@@ -462,7 +475,7 @@ export default function App() {
     }
     window.addEventListener("keydown", handleEditorShortcuts);
     return () => window.removeEventListener("keydown", handleEditorShortcuts);
-  }, [activeDocument, activeView, diffVersion, pendingRestoreVersion]);
+  }, [activeDocument, activeView, diffVersion, pendingRestoreVersion, contextMenu]);
 
  
 
@@ -1071,6 +1084,61 @@ async function refreshVersions(service: WorkspaceService) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo crear el vínculo.");
     }
+  }
+
+  function openEditorContextMenu(event: React.MouseEvent<HTMLTextAreaElement>) {
+    const anchor = selectedDocumentAnchor();
+    if (!anchor) return; // sin selección con texto, menú nativo
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, quote: anchor.quote });
+    setContextMenuView("root");
+  }
+
+  function closeContextMenu() {
+    setContextMenu(null);
+    setContextMenuView("root");
+  }
+
+  async function createEntityFromSelection(kind: KnowledgeEntity["kind"]) {
+    if (!projectId || !contextMenu) return;
+    const title = contextMenu.quote.trim().slice(0, 80) || "Ficha sin título";
+    try {
+      const service = await getWorkspace();
+      const entity = await service.createKnowledgeEntity({ projectId, kind, title });
+      setEntities((current) => [...current, entity]);
+      if (activeDocument && activeView === "writing") {
+        const anchor = selectedDocumentAnchor(activeDocument);
+        const relation = await service.createRelation({
+          projectId,
+          fromId: activeDocument.id,
+          fromType: "document",
+          toId: entity.id,
+          toType: "entity",
+          kind: "mentions",
+          anchor
+        });
+        setRelations((current) => [...current, relation]);
+      }
+      setSelectedEntityId(entity.id);
+      setActiveView("entities");
+      setShowContext(false);
+      closeContextMenu();
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo crear la ficha.");
+    }
+  }
+
+  async function linkEntityFromSelection(entityId: Id) {
+    if (!entityId) return;
+    await linkExistingItem("entity", entityId);
+    closeContextMenu();
+  }
+
+  async function linkSourceFromSelection(sourceId: Id) {
+    if (!sourceId) return;
+    await linkExistingItem("source", sourceId);
+    closeContextMenu();
   }
 
   async function includeFragment() {
@@ -2082,6 +2150,7 @@ async function refreshVersions(service: WorkspaceService) {
                     const { selectionStart, selectionEnd } = event.currentTarget;
                     setTextSelection(selectionEnd > selectionStart ? { start: selectionStart, end: selectionEnd } : null);
                   }}
+                  onContextMenu={openEditorContextMenu}
                   onBlur={() => void saveActiveDocument()}
                   placeholder="Empieza a escribir tus ideas..."
                   spellCheck
@@ -2713,6 +2782,101 @@ async function refreshVersions(service: WorkspaceService) {
       </div>
     </div>
   )}
+    {contextMenu && (
+      <div
+        className="editor-context-menu"
+        role="menu"
+        style={{
+          position: "fixed",
+          left: contextMenu.x,
+          top: contextMenu.y,
+          background: "#fbfaf6",
+          border: "1px solid #e3e1d8",
+          borderRadius: "8px",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
+          padding: "6px",
+          zIndex: 200,
+          minWidth: "220px",
+          fontSize: "13px"
+        }}
+      >
+        <div style={{ padding: "4px 8px", color: "#6f7369", fontSize: "11px" }}>
+          «{contextMenu.quote.slice(0, 40)}{contextMenu.quote.length > 40 ? "…" : ""}»
+        </div>
+
+        {contextMenuView === "root" && (
+          <>
+            <button type="button" className="context-menu-item" onClick={() => setContextMenuView("create")}>
+              Crear ficha y enlazar al pasaje →
+            </button>
+            <button type="button" className="context-menu-item" onClick={() => setContextMenuView("linkEntity")}>
+              Enlazar ficha existente →
+            </button>
+            {sources.length > 0 && (
+              <button type="button" className="context-menu-item" onClick={() => setContextMenuView("linkSource")}>
+                Enlazar fuente existente →
+              </button>
+            )}
+            <button type="button" className="context-menu-item" onClick={closeContextMenu}>
+              Cancelar
+            </button>
+          </>
+        )}
+
+        {contextMenuView === "create" && (
+          <>
+            {([
+              ["character", "Personaje"],
+              ["place", "Lugar"],
+              ["event", "Acontecimiento"],
+              ["concept", "Concepto"],
+              ["other", "Otro"]
+            ] as Array<[KnowledgeEntity["kind"], string]>).map(([kind, label]) => (
+              <button key={kind} type="button" className="context-menu-item" onClick={() => void createEntityFromSelection(kind)}>
+                {label}
+              </button>
+            ))}
+            <button type="button" className="context-menu-item" onClick={() => setContextMenuView("root")}>
+              ← Volver
+            </button>
+          </>
+        )}
+
+        {contextMenuView === "linkEntity" && (
+          <>
+            {entities.length === 0 ? (
+              <div style={{ padding: "6px 8px", color: "#6f7369" }}>No hay fichas todavía.</div>
+            ) : (
+              entities.slice(0, 12).map((entity) => (
+                <button key={entity.id} type="button" className="context-menu-item" onClick={() => void linkEntityFromSelection(entity.id)}>
+                  {entity.title}
+                </button>
+              ))
+            )}
+            <button type="button" className="context-menu-item" onClick={() => setContextMenuView("root")}>
+              ← Volver
+            </button>
+          </>
+        )}
+
+        {contextMenuView === "linkSource" && (
+          <>
+            {sources.length === 0 ? (
+              <div style={{ padding: "6px 8px", color: "#6f7369" }}>No hay fuentes todavía.</div>
+            ) : (
+              sources.slice(0, 12).map((source) => (
+                <button key={source.id} type="button" className="context-menu-item" onClick={() => void linkSourceFromSelection(source.id)}>
+                  {source.title}
+                </button>
+              ))
+            )}
+            <button type="button" className="context-menu-item" onClick={() => setContextMenuView("root")}>
+              ← Volver
+            </button>
+          </>
+        )}
+      </div>
+    )}
   </> 
   );
 }

@@ -854,6 +854,21 @@ textarea:focus-visible {
   font-size: 15px;
   cursor: not-allowed;
 }
+.context-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #2f322c;
+}
+.context-menu-item:hover {
+  background: #ece9df;
+}
 
 .context-section-title > .planned-badge { margin-left: auto; }
 .planned-section .context-section-title::after { margin-left: 0 !important; }
