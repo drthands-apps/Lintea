@@ -4691,56 +4691,42 @@ export default function App() {
               useDarkTheme={false}
               styles={{
                 variables: {
-                  light: {
-                    diffViewerBackground: "#fbfaf6",
-                    diffViewerTitleBackground: "#f2f1eb",
-                    diffViewerTitleColor: "#2f322c",
-                    diffViewerTitleBorderColor: "#e3e1d8",
-                    diffViewerColor: "#2f322c",
-                    addedBackground: "#e6f0e6",
-                    addedColor: "#2f5a2f",
-                    removedBackground: "#f4e4e2",
-                    removedColor: "#6b2f2f",
-                    wordAddedBackground: "#c8e6c8",
-                    wordRemovedBackground: "#f0c8c8",
-                    gutterBackground: "#f2f1eb",
-                    gutterBackgroundDark: "#ece9df",
-                    gutterColor: "#8a8c82",
-                    addedGutterBackground: "#d8e8d8",
-                    removedGutterBackground: "#ecd4d2",
-                    addedGutterColor: "#2f5a2f",
-                    removedGutterColor: "#6b2f2f",
-                    codeFoldBackground: "#f2f1eb",
-                    codeFoldGutterBackground: "#ece9df",
-                    emptyLineBackground: "#faf9f4",
-                    highlightBackground: "#fff3c4",
-                    highlightGutterBackground: "#f5e6a8",
-                  },
-                  dark: {
-                    diffViewerBackground: "#fbfaf6",
-                    diffViewerTitleBackground: "#f2f1eb",
-                    diffViewerTitleColor: "#2f322c",
-                    diffViewerTitleBorderColor: "#e3e1d8",
-                    diffViewerColor: "#2f322c",
-                    addedBackground: "#e6f0e6",
-                    addedColor: "#2f5a2f",
-                    removedBackground: "#f4e4e2",
-                    removedColor: "#6b2f2f",
-                    wordAddedBackground: "#c8e6c8",
-                    wordRemovedBackground: "#f0c8c8",
-                    gutterBackground: "#f2f1eb",
-                    gutterBackgroundDark: "#ece9df",
-                    gutterColor: "#8a8c82",
-                    addedGutterBackground: "#d8e8d8",
-                    removedGutterBackground: "#ecd4d2",
-                    addedGutterColor: "#2f5a2f",
-                    removedGutterColor: "#6b2f2f",
-                    codeFoldBackground: "#f2f1eb",
-                    codeFoldGutterBackground: "#ece9df",
-                    emptyLineBackground: "#faf9f4",
-                    highlightBackground: "#fff3c4",
-                    highlightGutterBackground: "#f5e6a8",
-                  }
+  light: {
+    diffViewerBackground: "#fbfaf6",
+    diffViewerTitleBackground: "#f2f1eb",
+    diffViewerTitleColor: "#2f322c",
+    diffViewerTitleBorderColor: "#e3e1d8",
+    diffViewerColor: "#2f322c",
+
+    // Líneas eliminadas: más contraste que #f4e4e2
+    removedBackground: "#f0d6d2",
+    removedColor: "#5a2320",
+    removedGutterBackground: "#e6c2be",
+    removedGutterColor: "#5a2320",
+
+    // Líneas añadidas: más contraste que #e6f0e6
+    addedBackground: "#d6e8d6",
+    addedColor: "#1f4a1f",
+    addedGutterBackground: "#bcd8bc",
+    addedGutterColor: "#1f4a1f",
+
+    // Palabras cambiadas: un paso más intenso que la línea
+    wordAddedBackground: "#a8d4a8",
+    wordRemovedBackground: "#e8b4ae",
+
+    // Gutter neutro
+    gutterBackground: "#f2f1eb",
+    gutterBackgroundDark: "#ece9df",
+    gutterColor: "#8a8c82",
+
+    // Code fold
+    codeFoldBackground: "#f2f1eb",
+    codeFoldGutterBackground: "#ece9df",
+    emptyLineBackground: "#faf9f4"
+
+    // highlightBackground y highlightGutterBackground: fuera, no se usan
+  }
+
                 },
                 titleBlock: {
                   padding: "8px 12px",
