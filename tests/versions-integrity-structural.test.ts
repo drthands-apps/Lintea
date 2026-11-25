@@ -9,14 +9,13 @@ function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     projectId: "p",
     title: "Título",
     text: "Texto",
-    kind: "note",       
-    order: 0,           
+    kind: "note",
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
-
 
 function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
   return {
@@ -26,10 +25,10 @@ function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     title: "Título",
     text: "Texto",
     kind: "note",
-    order: 0, 
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -41,7 +40,7 @@ function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
     fromStateId: "s1",
     toStateId: "s2",
     capturedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -50,11 +49,11 @@ describe("integridad estructural del historial", () => {
     const versions = [
       state({ id: "s1" }),
       state({ id: "s2" }),
-      state({ id: "s3" })
+      state({ id: "s3" }),
     ];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
-      relation({ id: "r2", fromStateId: "s2", toStateId: "s3" })
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s3" }),
     ];
     expect(() => validateRelations(relations, versions)).not.toThrow();
   });
@@ -63,7 +62,7 @@ describe("integridad estructural del historial", () => {
     const versions = [state({ id: "s1" }), state({ id: "s2" })];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
-      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" })
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" }),
     ];
     expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
   });
@@ -72,12 +71,12 @@ describe("integridad estructural del historial", () => {
     const versions = [
       state({ id: "s1" }),
       state({ id: "s2" }),
-      state({ id: "s3" })
+      state({ id: "s3" }),
     ];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
       relation({ id: "r2", fromStateId: "s2", toStateId: "s3" }),
-      relation({ id: "r3", fromStateId: "s3", toStateId: "s1" })
+      relation({ id: "r3", fromStateId: "s3", toStateId: "s1" }),
     ];
     expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
   });
@@ -85,7 +84,7 @@ describe("integridad estructural del historial", () => {
   it("rechaza una relación con un extremo inexistente", () => {
     const versions = [state({ id: "s1" })];
     const relations = [
-      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" })
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
     ];
     expect(() => validateRelations(relations, versions)).toThrow(/extremo/);
   });
@@ -93,7 +92,7 @@ describe("integridad estructural del historial", () => {
   it("rechaza una relación que conecta un estado consigo mismo", () => {
     const versions = [state({ id: "s1" })];
     const relations = [
-      relation({ id: "r1", fromStateId: "s1", toStateId: "s1" })
+      relation({ id: "r1", fromStateId: "s1", toStateId: "s1" }),
     ];
     expect(() => validateRelations(relations, versions)).toThrow(/mismo/);
   });
@@ -102,7 +101,7 @@ describe("integridad estructural del historial", () => {
     const versions = [state({ id: "s1" }), state({ id: "s2" })];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
-      relation({ id: "r2", fromStateId: "s1", toStateId: "s2" })
+      relation({ id: "r2", fromStateId: "s1", toStateId: "s2" }),
     ];
     expect(() => validateRelations(relations, versions)).toThrow(/duplicada/);
   });
@@ -111,7 +110,7 @@ describe("integridad estructural del historial", () => {
     const versions = [state({ id: "s1" }), state({ id: "s2" })];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
-      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" })
+      relation({ id: "r2", fromStateId: "s2", toStateId: "s1" }),
     ];
     // s1 → s2 y s2 → s1 forman un ciclo, así que se rechaza.
     expect(() => validateRelations(relations, versions)).toThrow(/ciclo/);
@@ -124,13 +123,13 @@ describe("integridad estructural del historial", () => {
       state({ id: "s1" }),
       state({ id: "s2" }),
       state({ id: "s3" }),
-      state({ id: "s4" })
+      state({ id: "s4" }),
     ];
     const relations = [
       relation({ id: "r1", fromStateId: "s1", toStateId: "s2" }),
       relation({ id: "r2", fromStateId: "s1", toStateId: "s3" }),
       relation({ id: "r3", fromStateId: "s2", toStateId: "s4" }),
-      relation({ id: "r4", fromStateId: "s3", toStateId: "s4" })
+      relation({ id: "r4", fromStateId: "s3", toStateId: "s4" }),
     ];
     expect(() => validateRelations(relations, versions)).not.toThrow();
   });

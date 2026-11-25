@@ -78,9 +78,7 @@ Ejemplo de composición:
     {
       "documentId": "chapter-uuid",
       "order": 0,
-      "fragments": [
-        { "fragmentId": "fragment-uuid", "order": 0 }
-      ]
+      "fragments": [{ "fragmentId": "fragment-uuid", "order": 0 }]
     }
   ]
 }
@@ -91,4 +89,3 @@ Ejemplo de composición:
 Todo paquete declara `formatVersion` en `manifest.json`. Un importador valida la versión, JSON, IDs y referencias antes de aplicar cambios. Versiones desconocidas no se abren silenciosamente. Las exportaciones posteriores pueden añadir campos opcionales compatibles; cambios incompatibles requieren una versión mayor del formato y una migración documentada.
 
 La exportación incluye el proyecto completo. La persona puede inspeccionar y recuperar los Markdown y JSON con herramientas comunes aunque Lintea no esté instalado.
-

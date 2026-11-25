@@ -1,4 +1,3 @@
-
 import type {
   DocumentRecord,
   Id,
@@ -9,11 +8,10 @@ import type {
   CompositionEntry,
   AuthorNote,
   Tag,
-  TagAssignment
+  TagAssignment,
 } from "./model.js";
 import type { DocumentVersion, VersionRelation } from "./versions.js";
 import type { ProjectStorage } from "./storage.js";
-
 
 function copyProject(project: Project): Project {
   return {
@@ -21,11 +19,9 @@ function copyProject(project: Project): Project {
     context: project.context
       ? {
           ...project.context,
-          additionalLanguages: [
-            ...project.context.additionalLanguages
-          ]
+          additionalLanguages: [...project.context.additionalLanguages],
         }
-      : undefined
+      : undefined,
   };
 }
 
@@ -33,7 +29,7 @@ function copyEntity(entity: KnowledgeEntity): KnowledgeEntity {
   return {
     ...entity,
     details: entity.details?.map((detail) => ({ ...detail })),
-    externalLinks: entity.externalLinks?.map((link) => ({ ...link }))
+    externalLinks: entity.externalLinks?.map((link) => ({ ...link })),
   };
 }
 
@@ -68,16 +64,14 @@ export class MemoryProjectStorage implements ProjectStorage {
   }
 
   async updateProject(project: Project): Promise<void> {
-  if (!this.projects.has(project.id)) {
-    throw new Error("No se puede actualizar un proyecto que no existe.");
+    if (!this.projects.has(project.id)) {
+      throw new Error("No se puede actualizar un proyecto que no existe.");
+    }
+
+    this.projects.set(project.id, copyProject(project));
   }
 
-  
-
-  this.projects.set(project.id, copyProject(project));
-}
-
-async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
+  async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     return [...this.documents.values()]
       .filter((document) => document.projectId === projectId)
       .map((document) => ({ ...document }));
@@ -110,10 +104,14 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     }
 
     const current = this.documents.get(document.id)!;
-    this.documents.set(document.id, { ...document, kind: document.kind ?? current.kind, order: document.order ?? current.order });
+    this.documents.set(document.id, {
+      ...document,
+      kind: document.kind ?? current.kind,
+      order: document.order ?? current.order,
+    });
   }
 
-    async updateDocumentVersion(version: DocumentVersion): Promise<void> {
+  async updateDocumentVersion(version: DocumentVersion): Promise<void> {
     if (!this.versions.has(version.id)) {
       throw new Error("No se puede actualizar una versión que no existe.");
     }
@@ -121,18 +119,28 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   }
 
   async listKnowledgeEntities(projectId: Id): Promise<KnowledgeEntity[]> {
-    return [...this.entities.values()].filter((item) => item.projectId === projectId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title)).map(copyEntity);
+    return [...this.entities.values()]
+      .filter((item) => item.projectId === projectId)
+      .sort(
+        (a, b) =>
+          (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title),
+      )
+      .map(copyEntity);
   }
 
   async createKnowledgeEntity(entity: KnowledgeEntity): Promise<void> {
-    if (!this.projects.has(entity.projectId)) throw new Error("El proyecto de la ficha no existe.");
-    if (this.entities.has(entity.id)) throw new Error("Ya existe una ficha con ese identificador.");
+    if (!this.projects.has(entity.projectId))
+      throw new Error("El proyecto de la ficha no existe.");
+    if (this.entities.has(entity.id))
+      throw new Error("Ya existe una ficha con ese identificador.");
     this.entities.set(entity.id, copyEntity(entity));
   }
 
   async updateKnowledgeEntity(entity: KnowledgeEntity): Promise<void> {
-    if (!this.entities.has(entity.id)) throw new Error("No se puede actualizar una ficha que no existe.");
-    if (!this.projects.has(entity.projectId)) throw new Error("El proyecto de la ficha no existe.");
+    if (!this.entities.has(entity.id))
+      throw new Error("No se puede actualizar una ficha que no existe.");
+    if (!this.projects.has(entity.projectId))
+      throw new Error("El proyecto de la ficha no existe.");
     this.entities.set(entity.id, copyEntity(entity));
   }
 
@@ -144,32 +152,52 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     for (const [id, relation] of this.relations) {
       const referencesEntity = (type: Relation["fromType"], targetId: Id) =>
         (type === "entity" || type === "event") && targetId === entityId;
-      if (relation.projectId === projectId &&
-        (referencesEntity(relation.fromType, relation.fromId) || referencesEntity(relation.toType, relation.toId))) {
+      if (
+        relation.projectId === projectId &&
+        (referencesEntity(relation.fromType, relation.fromId) ||
+          referencesEntity(relation.toType, relation.toId))
+      ) {
         this.relations.delete(id);
       }
     }
     for (const [id, note] of this.notes) {
-      if (note.projectId === projectId && note.targetId === entityId && (note.targetType === "entity" || note.targetType === "event")) {
-        this.notes.set(id, { ...note, targetType: undefined, targetId: undefined });
+      if (
+        note.projectId === projectId &&
+        note.targetId === entityId &&
+        (note.targetType === "entity" || note.targetType === "event")
+      ) {
+        this.notes.set(id, {
+          ...note,
+          targetType: undefined,
+          targetId: undefined,
+        });
       }
     }
-
   }
 
   async listSources(projectId: Id): Promise<SourceRecord[]> {
-    return [...this.sources.values()].filter((item) => item.projectId === projectId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title)).map((item) => ({ ...item }));
+    return [...this.sources.values()]
+      .filter((item) => item.projectId === projectId)
+      .sort(
+        (a, b) =>
+          (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title),
+      )
+      .map((item) => ({ ...item }));
   }
 
   async createSource(source: SourceRecord): Promise<void> {
-    if (!this.projects.has(source.projectId)) throw new Error("El proyecto de la fuente no existe.");
-    if (this.sources.has(source.id)) throw new Error("Ya existe una fuente con ese identificador.");
+    if (!this.projects.has(source.projectId))
+      throw new Error("El proyecto de la fuente no existe.");
+    if (this.sources.has(source.id))
+      throw new Error("Ya existe una fuente con ese identificador.");
     this.sources.set(source.id, { ...source });
   }
 
   async updateSource(source: SourceRecord): Promise<void> {
-    if (!this.sources.has(source.id)) throw new Error("No se puede actualizar una fuente que no existe.");
-    if (!this.projects.has(source.projectId)) throw new Error("El proyecto de la fuente no existe.");
+    if (!this.sources.has(source.id))
+      throw new Error("No se puede actualizar una fuente que no existe.");
+    if (!this.projects.has(source.projectId))
+      throw new Error("El proyecto de la fuente no existe.");
     this.sources.set(source.id, { ...source });
   }
 
@@ -178,32 +206,56 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     this.sources.delete(sourceId);
     this.removeTagAssignments(projectId, "source", sourceId);
     for (const [id, relation] of this.relations) {
-      if (relation.projectId === projectId &&
+      if (
+        relation.projectId === projectId &&
         ((relation.fromType === "source" && relation.fromId === sourceId) ||
-         (relation.toType === "source" && relation.toId === sourceId))) {
+          (relation.toType === "source" && relation.toId === sourceId))
+      ) {
         this.relations.delete(id);
       }
     }
     for (const [id, note] of this.notes) {
-      if (note.projectId === projectId && note.targetType === "source" && note.targetId === sourceId) {
-        this.notes.set(id, { ...note, targetType: undefined, targetId: undefined });
+      if (
+        note.projectId === projectId &&
+        note.targetType === "source" &&
+        note.targetId === sourceId
+      ) {
+        this.notes.set(id, {
+          ...note,
+          targetType: undefined,
+          targetId: undefined,
+        });
       }
     }
   }
 
   async listRelations(projectId: Id): Promise<Relation[]> {
-    return [...this.relations.values()].filter((item) => item.projectId === projectId).map((item) => ({ ...item, anchor: item.anchor ? { ...item.anchor } : undefined }));
+    return [...this.relations.values()]
+      .filter((item) => item.projectId === projectId)
+      .map((item) => ({
+        ...item,
+        anchor: item.anchor ? { ...item.anchor } : undefined,
+      }));
   }
 
   async createRelation(relation: Relation): Promise<void> {
-    if (!this.projects.has(relation.projectId)) throw new Error("El proyecto de la relación no existe.");
-    if (this.relations.has(relation.id)) throw new Error("Ya existe una relación con ese identificador.");
-    this.relations.set(relation.id, { ...relation, anchor: relation.anchor ? { ...relation.anchor } : undefined });
+    if (!this.projects.has(relation.projectId))
+      throw new Error("El proyecto de la relación no existe.");
+    if (this.relations.has(relation.id))
+      throw new Error("Ya existe una relación con ese identificador.");
+    this.relations.set(relation.id, {
+      ...relation,
+      anchor: relation.anchor ? { ...relation.anchor } : undefined,
+    });
   }
 
   async updateRelation(relation: Relation): Promise<void> {
-    if (this.relations.get(relation.id)?.projectId !== relation.projectId) throw new Error("No se puede actualizar una relación que no existe.");
-    this.relations.set(relation.id, { ...relation, anchor: relation.anchor ? { ...relation.anchor } : undefined });
+    if (this.relations.get(relation.id)?.projectId !== relation.projectId)
+      throw new Error("No se puede actualizar una relación que no existe.");
+    this.relations.set(relation.id, {
+      ...relation,
+      anchor: relation.anchor ? { ...relation.anchor } : undefined,
+    });
   }
 
   async deleteRelation(projectId: Id, relationId: Id): Promise<void> {
@@ -212,30 +264,53 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   }
 
   async listCompositionEntries(chapterId: Id): Promise<CompositionEntry[]> {
-    return [...this.composition.values()].filter((item) => item.chapterId === chapterId).sort((a, b) => a.order - b.order).map((item) => ({ ...item }));
+    return [...this.composition.values()]
+      .filter((item) => item.chapterId === chapterId)
+      .sort((a, b) => a.order - b.order)
+      .map((item) => ({ ...item }));
   }
 
   async createCompositionEntry(entry: CompositionEntry): Promise<void> {
     const chapter = this.documents.get(entry.chapterId);
     const fragment = this.documents.get(entry.fragmentId);
-    if (!chapter || !fragment || chapter.projectId !== entry.projectId || fragment.projectId !== entry.projectId) {
-      throw new Error("El capítulo y el fragmento deben pertenecer al mismo proyecto.");
+    if (
+      !chapter ||
+      !fragment ||
+      chapter.projectId !== entry.projectId ||
+      fragment.projectId !== entry.projectId
+    ) {
+      throw new Error(
+        "El capítulo y el fragmento deben pertenecer al mismo proyecto.",
+      );
     }
     if (chapter.kind !== "chapter" || fragment.kind !== "fragment") {
       throw new Error("La composición requiere un capítulo y un fragmento.");
     }
-    if (this.composition.has(entry.id)) throw new Error("Ya existe una pieza con ese identificador.");
+    if (this.composition.has(entry.id))
+      throw new Error("Ya existe una pieza con ese identificador.");
     this.composition.set(entry.id, { ...entry });
   }
 
   async deleteCompositionEntry(chapterId: Id, entryId: Id): Promise<void> {
-    if (this.composition.get(entryId)?.chapterId === chapterId) this.composition.delete(entryId);
+    if (this.composition.get(entryId)?.chapterId === chapterId)
+      this.composition.delete(entryId);
   }
 
-  async reorderCompositionEntries(chapterId: Id, entryIds: Id[]): Promise<void> {
-    const entries = [...this.composition.values()].filter((item) => item.chapterId === chapterId);
-    if (entries.length !== entryIds.length || new Set(entryIds).size !== entryIds.length || entries.some((item) => !entryIds.includes(item.id))) {
-      throw new Error("El nuevo orden debe incluir cada pieza del capítulo exactamente una vez.");
+  async reorderCompositionEntries(
+    chapterId: Id,
+    entryIds: Id[],
+  ): Promise<void> {
+    const entries = [...this.composition.values()].filter(
+      (item) => item.chapterId === chapterId,
+    );
+    if (
+      entries.length !== entryIds.length ||
+      new Set(entryIds).size !== entryIds.length ||
+      entries.some((item) => !entryIds.includes(item.id))
+    ) {
+      throw new Error(
+        "El nuevo orden debe incluir cada pieza del capítulo exactamente una vez.",
+      );
     }
     entryIds.forEach((id, order) => {
       const entry = this.composition.get(id)!;
@@ -244,18 +319,29 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   }
 
   async listAuthorNotes(projectId: Id): Promise<AuthorNote[]> {
-    return [...this.notes.values()].filter((note) => note.projectId === projectId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || b.updatedAt.localeCompare(a.updatedAt)).map((note) => ({ ...note }));
+    return [...this.notes.values()]
+      .filter((note) => note.projectId === projectId)
+      .sort(
+        (a, b) =>
+          (a.order ?? 0) - (b.order ?? 0) ||
+          b.updatedAt.localeCompare(a.updatedAt),
+      )
+      .map((note) => ({ ...note }));
   }
 
   async createAuthorNote(note: AuthorNote): Promise<void> {
-    if (!this.projects.has(note.projectId)) throw new Error("El proyecto de la nota no existe.");
-    if (this.notes.has(note.id)) throw new Error("Ya existe una nota con ese identificador.");
+    if (!this.projects.has(note.projectId))
+      throw new Error("El proyecto de la nota no existe.");
+    if (this.notes.has(note.id))
+      throw new Error("Ya existe una nota con ese identificador.");
     this.notes.set(note.id, { ...note });
   }
 
   async updateAuthorNote(note: AuthorNote): Promise<void> {
-    if (!this.notes.has(note.id)) throw new Error("No se puede actualizar una nota que no existe.");
-    if (!this.projects.has(note.projectId)) throw new Error("El proyecto de la nota no existe.");
+    if (!this.notes.has(note.id))
+      throw new Error("No se puede actualizar una nota que no existe.");
+    if (!this.projects.has(note.projectId))
+      throw new Error("El proyecto de la nota no existe.");
     this.notes.set(note.id, { ...note });
   }
 
@@ -266,9 +352,9 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     }
   }
 
-    async listDocumentVersions(
+  async listDocumentVersions(
     documentId: Id,
-    options: { includeHidden?: boolean } = {}
+    options: { includeHidden?: boolean } = {},
   ): Promise<DocumentVersion[]> {
     return [...this.versions.values()]
       .filter((version) => version.documentId === documentId)
@@ -294,7 +380,9 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     }
 
     if (document.projectId !== version.projectId) {
-      throw new Error("El proyecto de la versión no coincide con el documento.");
+      throw new Error(
+        "El proyecto de la versión no coincide con el documento.",
+      );
     }
 
     this.versions.set(version.id, { ...version });
@@ -305,23 +393,44 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
   }
 
   async listTags(projectId: Id): Promise<Tag[]> {
-    return [...this.tags.values()].filter((tag) => tag.projectId === projectId)
+    return [...this.tags.values()]
+      .filter((tag) => tag.projectId === projectId)
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
   }
 
   async createTag(tag: Tag): Promise<void> {
-    if (!this.projects.has(tag.projectId)) throw new Error("El proyecto de la etiqueta no existe.");
-    if (this.tags.has(tag.id)) throw new Error("Ya existe una etiqueta con ese identificador.");
-    if ([...this.tags.values()].some((item) => item.projectId === tag.projectId && item.normalizedName === tag.normalizedName)) {
-      throw new Error("Ya existe una etiqueta con ese nombre en este proyecto.");
+    if (!this.projects.has(tag.projectId))
+      throw new Error("El proyecto de la etiqueta no existe.");
+    if (this.tags.has(tag.id))
+      throw new Error("Ya existe una etiqueta con ese identificador.");
+    if (
+      [...this.tags.values()].some(
+        (item) =>
+          item.projectId === tag.projectId &&
+          item.normalizedName === tag.normalizedName,
+      )
+    ) {
+      throw new Error(
+        "Ya existe una etiqueta con ese nombre en este proyecto.",
+      );
     }
     this.tags.set(tag.id, { ...tag });
   }
 
   async updateTag(tag: Tag): Promise<void> {
-    if (this.tags.get(tag.id)?.projectId !== tag.projectId) throw new Error("No se puede actualizar una etiqueta que no existe.");
-    if ([...this.tags.values()].some((item) => item.id !== tag.id && item.projectId === tag.projectId && item.normalizedName === tag.normalizedName)) {
-      throw new Error("Ya existe una etiqueta con ese nombre en este proyecto.");
+    if (this.tags.get(tag.id)?.projectId !== tag.projectId)
+      throw new Error("No se puede actualizar una etiqueta que no existe.");
+    if (
+      [...this.tags.values()].some(
+        (item) =>
+          item.id !== tag.id &&
+          item.projectId === tag.projectId &&
+          item.normalizedName === tag.normalizedName,
+      )
+    ) {
+      throw new Error(
+        "Ya existe una etiqueta con ese nombre en este proyecto.",
+      );
     }
     this.tags.set(tag.id, { ...tag });
   }
@@ -330,38 +439,66 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
     if (this.tags.get(tagId)?.projectId !== projectId) return;
     this.tags.delete(tagId);
     for (const [key, assignment] of this.tagAssignments) {
-      if (assignment.projectId === projectId && assignment.tagId === tagId) this.tagAssignments.delete(key);
+      if (assignment.projectId === projectId && assignment.tagId === tagId)
+        this.tagAssignments.delete(key);
     }
   }
 
   async listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
-    return [...this.tagAssignments.values()].filter((item) => item.projectId === projectId).map((item) => ({
-      ...item, ...(item.anchor ? { anchor: { ...item.anchor } } : {})
-    }));
+    return [...this.tagAssignments.values()]
+      .filter((item) => item.projectId === projectId)
+      .map((item) => ({
+        ...item,
+        ...(item.anchor ? { anchor: { ...item.anchor } } : {}),
+      }));
   }
 
   async assignTag(assignment: TagAssignment): Promise<void> {
-    if (this.tags.get(assignment.tagId)?.projectId !== assignment.projectId) throw new Error("La etiqueta no pertenece a este proyecto.");
-    const targetExists = assignment.targetType === "document"
-      ? this.documents.get(assignment.targetId)?.projectId === assignment.projectId
-      : assignment.targetType === "entity"
-        ? this.entities.get(assignment.targetId)?.projectId === assignment.projectId
-        : assignment.targetType === "source"
-          ? this.sources.get(assignment.targetId)?.projectId === assignment.projectId
-          : this.notes.get(assignment.targetId)?.projectId === assignment.projectId;
-    if (!targetExists) throw new Error("El elemento etiquetado no pertenece a este proyecto.");
-    const anchorKey = assignment.anchor ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}` : "";
-    this.tagAssignments.set(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`, { ...assignment });
+    if (this.tags.get(assignment.tagId)?.projectId !== assignment.projectId)
+      throw new Error("La etiqueta no pertenece a este proyecto.");
+    const targetExists =
+      assignment.targetType === "document"
+        ? this.documents.get(assignment.targetId)?.projectId ===
+          assignment.projectId
+        : assignment.targetType === "entity"
+          ? this.entities.get(assignment.targetId)?.projectId ===
+            assignment.projectId
+          : assignment.targetType === "source"
+            ? this.sources.get(assignment.targetId)?.projectId ===
+              assignment.projectId
+            : this.notes.get(assignment.targetId)?.projectId ===
+              assignment.projectId;
+    if (!targetExists)
+      throw new Error("El elemento etiquetado no pertenece a este proyecto.");
+    const anchorKey = assignment.anchor
+      ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}`
+      : "";
+    this.tagAssignments.set(
+      `${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`,
+      { ...assignment },
+    );
   }
 
   async unassignTag(assignment: TagAssignment): Promise<void> {
-    const anchorKey = assignment.anchor ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}` : "";
-    this.tagAssignments.delete(`${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`);
+    const anchorKey = assignment.anchor
+      ? `:${assignment.anchor.documentId}:${assignment.anchor.quote}:${assignment.anchor.prefix}:${assignment.anchor.suffix}`
+      : "";
+    this.tagAssignments.delete(
+      `${assignment.tagId}:${assignment.targetType}:${assignment.targetId}${anchorKey}`,
+    );
   }
 
-  private removeTagAssignments(projectId: Id, targetType: TagAssignment["targetType"], targetId: Id): void {
+  private removeTagAssignments(
+    projectId: Id,
+    targetType: TagAssignment["targetType"],
+    targetId: Id,
+  ): void {
     for (const [key, assignment] of this.tagAssignments) {
-      if (assignment.projectId === projectId && assignment.targetType === targetType && assignment.targetId === targetId) {
+      if (
+        assignment.projectId === projectId &&
+        assignment.targetType === targetType &&
+        assignment.targetId === targetId
+      ) {
         this.tagAssignments.delete(key);
       }
     }
@@ -375,14 +512,18 @@ async listDocuments(projectId: Id): Promise<DocumentRecord[]> {
 
   async createVersionRelation(relation: VersionRelation): Promise<void> {
     if (this.versionRelations.has(relation.id)) {
-      throw new Error("Ya existe una relación de historial con ese identificador.");
+      throw new Error(
+        "Ya existe una relación de historial con ese identificador.",
+      );
     }
     this.versionRelations.set(relation.id, { ...relation });
   }
 
   async updateVersionRelation(relation: VersionRelation): Promise<void> {
     if (!this.versionRelations.has(relation.id)) {
-      throw new Error("No se puede actualizar una relación de historial que no existe.");
+      throw new Error(
+        "No se puede actualizar una relación de historial que no existe.",
+      );
     }
     this.versionRelations.set(relation.id, { ...relation });
   }

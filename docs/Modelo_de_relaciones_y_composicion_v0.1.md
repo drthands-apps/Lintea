@@ -88,4 +88,3 @@ El estado del almacenamiento permanece visible en la barra superior. El document
 La primera entrega debe cubrir el recorrido de extremo a extremo con fragmentos, capítulos, fichas y fuentes, relaciones guardadas localmente y orden explícito. La comparación visual de versiones, las líneas temporales complejas, los tableros y la personalización por skins quedan fuera de este primer corte.
 
 El almacenamiento activo de escritorio sigue en SQLite. La exportación/importación LinteaZip debe poder reconstruir los elementos, relaciones, composición y versiones con sus IDs, sin copiar el texto de un fragmento al incorporarlo a un capítulo.
-

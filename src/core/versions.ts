@@ -1,4 +1,3 @@
-
 import type { DocumentRecord, Id } from "./model.js";
 import { createId } from "./model.js";
 
@@ -51,8 +50,6 @@ export type DocumentChange =
   | { kind: "note.removed"; noteId: Id }
   | { kind: "composition.added"; entryId: Id }
   | { kind: "composition.removed"; entryId: Id };
-
- 
 
 /**
  * Relación del historial: arista entre dos estados del pasado.
@@ -160,7 +157,6 @@ export interface DocumentState {
   };
 }
 
-
 export interface CreateVersionInput {
   label?: string;
   note?: string;
@@ -171,8 +167,6 @@ function optionalText(value: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
-
-
 /**
  * Crea una fotografía del estado actual del documento.
  * No modifica el documento original.
@@ -180,7 +174,7 @@ function optionalText(value: string | undefined): string | undefined {
 export function createDocumentVersion(
   document: DocumentRecord,
   input: CreateVersionInput = {},
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): DocumentVersion {
   const date = now();
 
@@ -199,8 +193,8 @@ export function createDocumentVersion(
     capturedAt: date.toISOString(),
     documentUpdatedAt: document.updatedAt,
     label: optionalText(input.label),
-    note: optionalText(input.note)
- 
+    note: optionalText(input.note),
+
     // Sin pinned, sin baseStateId, sin changes: es un estado íntegro.
     // Los hashes y las referencias se calculan en la capa de servicio,
     // que conoce el proyecto completo.
@@ -217,18 +211,16 @@ export function createDocumentVersion(
 export function restoreDocumentVersion(
   current: DocumentRecord,
   version: DocumentVersion,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): DocumentRecord {
   if (current.id !== version.documentId) {
     throw new Error(
-      "La versión no pertenece al documento que se quiere recuperar."
+      "La versión no pertenece al documento que se quiere recuperar.",
     );
   }
 
   if (current.projectId !== version.projectId) {
-    throw new Error(
-      "La versión no pertenece al proyecto del documento."
-    );
+    throw new Error("La versión no pertenece al proyecto del documento.");
   }
 
   const date = now();
@@ -246,7 +238,7 @@ export function restoreDocumentVersion(
     ...current,
     title: version.title,
     text: version.text,
-    updatedAt: date.toISOString()
+    updatedAt: date.toISOString(),
   };
 }
 /**
@@ -275,9 +267,14 @@ export function rebaseOrphanChild(
   child: DocumentVersion,
   grandparent: DocumentVersion | undefined,
   currentDocument: import("./model.js").DocumentRecord,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): DocumentVersion {
-  const reconstructed = reconstructVersion(versions, [], child.id, currentDocument);
+  const reconstructed = reconstructVersion(
+    versions,
+    [],
+    child.id,
+    currentDocument,
+  );
 
   const baseState = grandparent
     ? reconstructVersion(versions, [], grandparent.id, currentDocument)
@@ -305,14 +302,14 @@ export function rebaseOrphanChild(
       title: reconstructed.title,
       text: reconstructed.text,
       kind: reconstructed.kind,
-      order: reconstructed.order
+      order: reconstructed.order,
     }),
     referenceHash: referenceHash({
       relationIds: child.relationIds ?? [],
       tagAssignmentKeys: child.tagAssignmentKeys ?? [],
       authorNoteIds: child.authorNoteIds ?? [],
-      compositionEntryIds: child.compositionEntryIds ?? []
-    })
+      compositionEntryIds: child.compositionEntryIds ?? [],
+    }),
   };
 
   if (canDelta && baseState && grandparent) {
@@ -320,9 +317,14 @@ export function rebaseOrphanChild(
       { kind: "title", from: baseState.title, to: reconstructed.title },
       { kind: "text", from: baseState.text, to: reconstructed.text, hunks: [] },
       { kind: "kind", from: baseState.kind, to: reconstructed.kind },
-      { kind: "order", from: baseState.order, to: reconstructed.order }
+      { kind: "order", from: baseState.order, to: reconstructed.order },
     ].filter((c) => {
-      if (c.kind === "title" || c.kind === "text" || c.kind === "kind" || c.kind === "order") {
+      if (
+        c.kind === "title" ||
+        c.kind === "text" ||
+        c.kind === "kind" ||
+        c.kind === "order"
+      ) {
         return c.from !== c.to;
       }
       return true;
@@ -332,13 +334,13 @@ export function rebaseOrphanChild(
       ...common,
       pinned: false,
       baseStateId: grandparent.id,
-      changes
+      changes,
     };
   }
 
   return {
     ...common,
-    pinned: true
+    pinned: true,
   };
 }
 /**
@@ -367,22 +369,32 @@ function sha256Hex(input: string): string {
   // Ver https://datatracker.ietf.org/doc/html/rfc6234
   const bytes = new TextEncoder().encode(input);
   const K = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+    0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+    0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+    0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+    0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
   ];
-  let h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  let h = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
+    0x1f83d9ab, 0x5be0cd19,
+  ];
   const bitLen = bytes.length * 8;
   const withPadding = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
   withPadding.set(bytes);
   withPadding[bytes.length] = 0x80;
   const view = new DataView(withPadding.buffer);
-  view.setUint32(withPadding.length - 8, Math.floor(bitLen / 0x100000000), false);
+  view.setUint32(
+    withPadding.length - 8,
+    Math.floor(bitLen / 0x100000000),
+    false,
+  );
   view.setUint32(withPadding.length - 4, bitLen >>> 0, false);
   const w = new Uint32Array(64);
   for (let offset = 0; offset < withPadding.length; offset += 64) {
@@ -400,11 +412,25 @@ function sha256Hex(input: string): string {
       const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
       const maj = (a & b) ^ (a & c) ^ (b & c);
       const t2 = (S0 + maj) >>> 0;
-      hh = g; g = f; f = e; e = (d + t1) >>> 0;
-      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+      hh = g;
+      g = f;
+      f = e;
+      e = (d + t1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (t1 + t2) >>> 0;
     }
-    h = [(h[0]! + a) >>> 0, (h[1]! + b) >>> 0, (h[2]! + c) >>> 0, (h[3]! + d) >>> 0,
-         (h[4]! + e) >>> 0, (h[5]! + f) >>> 0, (h[6]! + g) >>> 0, (h[7]! + hh) >>> 0];
+    h = [
+      (h[0]! + a) >>> 0,
+      (h[1]! + b) >>> 0,
+      (h[2]! + c) >>> 0,
+      (h[3]! + d) >>> 0,
+      (h[4]! + e) >>> 0,
+      (h[5]! + f) >>> 0,
+      (h[6]! + g) >>> 0,
+      (h[7]! + hh) >>> 0,
+    ];
   }
   return h.map((n) => n.toString(16).padStart(8, "0")).join("");
 }
@@ -413,13 +439,13 @@ function rotr(x: number, n: number): number {
 }
 
 export function contentHash(
-  state: Pick<DocumentState, "title" | "text" | "kind" | "order">
+  state: Pick<DocumentState, "title" | "text" | "kind" | "order">,
 ): string {
   const canonical = canonicalJson({
     title: state.title,
     text: state.text,
     kind: state.kind,
-    order: state.order
+    order: state.order,
   });
   return sha256Hex(canonical);
 }
@@ -427,33 +453,80 @@ export function contentHash(
 export function referenceHash(
   state: Pick<
     DocumentState,
-    "relationIds" | "tagAssignmentKeys" | "authorNoteIds" | "compositionEntryIds"
-  >
+    | "relationIds"
+    | "tagAssignmentKeys"
+    | "authorNoteIds"
+    | "compositionEntryIds"
+  >,
 ): string {
   const canonical = canonicalJson({
     relationIds: [...(state.relationIds ?? [])].sort(),
     tagAssignmentKeys: [...(state.tagAssignmentKeys ?? [])].sort(),
     authorNoteIds: [...(state.authorNoteIds ?? [])].sort(),
-    compositionEntryIds: [...(state.compositionEntryIds ?? [])].sort()
+    compositionEntryIds: [...(state.compositionEntryIds ?? [])].sort(),
   });
   return sha256Hex(canonical);
 }
 
-function applyChange(state: DocumentState, change: DocumentChange): DocumentState {
+function applyChange(
+  state: DocumentState,
+  change: DocumentChange,
+): DocumentState {
   switch (change.kind) {
-    case "title": return { ...state, title: change.to };
-    case "text": return { ...state, text: change.to };
-    case "kind": return { ...state, kind: change.to as DocumentState["kind"] };
-    case "order": return { ...state, order: change.to };
-    case "relation.added": return { ...state, relationIds: [...state.relationIds, change.relationId] };
-    case "relation.removed": return { ...state, relationIds: state.relationIds.filter((id) => id !== change.relationId) };
-    case "tag.assigned": return { ...state, tagAssignmentKeys: [...state.tagAssignmentKeys, change.tagId] };
-    case "tag.unassigned": return { ...state, tagAssignmentKeys: state.tagAssignmentKeys.filter((key) => key !== change.tagId) };
-    case "note.added": return { ...state, authorNoteIds: [...state.authorNoteIds, change.noteId] };
-    case "note.removed": return { ...state, authorNoteIds: state.authorNoteIds.filter((id) => id !== change.noteId) };
-    case "composition.added": return { ...state, compositionEntryIds: [...state.compositionEntryIds, change.entryId] };
-    case "composition.removed": return { ...state, compositionEntryIds: state.compositionEntryIds.filter((id) => id !== change.entryId) };
-    default: return state;
+    case "title":
+      return { ...state, title: change.to };
+    case "text":
+      return { ...state, text: change.to };
+    case "kind":
+      return { ...state, kind: change.to as DocumentState["kind"] };
+    case "order":
+      return { ...state, order: change.to };
+    case "relation.added":
+      return {
+        ...state,
+        relationIds: [...state.relationIds, change.relationId],
+      };
+    case "relation.removed":
+      return {
+        ...state,
+        relationIds: state.relationIds.filter((id) => id !== change.relationId),
+      };
+    case "tag.assigned":
+      return {
+        ...state,
+        tagAssignmentKeys: [...state.tagAssignmentKeys, change.tagId],
+      };
+    case "tag.unassigned":
+      return {
+        ...state,
+        tagAssignmentKeys: state.tagAssignmentKeys.filter(
+          (key) => key !== change.tagId,
+        ),
+      };
+    case "note.added":
+      return {
+        ...state,
+        authorNoteIds: [...state.authorNoteIds, change.noteId],
+      };
+    case "note.removed":
+      return {
+        ...state,
+        authorNoteIds: state.authorNoteIds.filter((id) => id !== change.noteId),
+      };
+    case "composition.added":
+      return {
+        ...state,
+        compositionEntryIds: [...state.compositionEntryIds, change.entryId],
+      };
+    case "composition.removed":
+      return {
+        ...state,
+        compositionEntryIds: state.compositionEntryIds.filter(
+          (id) => id !== change.entryId,
+        ),
+      };
+    default:
+      return state;
   }
 }
 
@@ -464,16 +537,20 @@ function applyChange(state: DocumentState, change: DocumentChange): DocumentStat
 function findPath(
   relations: VersionRelation[],
   startId: Id,
-  targetId: Id
+  targetId: Id,
 ): VersionRelation[] | null {
-  const queue: { id: Id; path: VersionRelation[] }[] = [{ id: startId, path: [] }];
+  const queue: { id: Id; path: VersionRelation[] }[] = [
+    { id: startId, path: [] },
+  ];
   const visited = new Set<Id>([startId]);
 
   while (queue.length > 0) {
     const { id, path } = queue.shift()!;
     if (id === targetId) return path;
 
-    const outgoing = relations.filter((r) => r.fromStateId === id && !r.fromMissing && !r.toMissing);
+    const outgoing = relations.filter(
+      (r) => r.fromStateId === id && !r.fromMissing && !r.toMissing,
+    );
     for (const rel of outgoing) {
       if (!visited.has(rel.toStateId)) {
         visited.add(rel.toStateId);
@@ -488,7 +565,7 @@ export function reconstructVersion(
   versions: DocumentVersion[],
   relations: VersionRelation[],
   targetStateId: Id,
-  currentDocument: import("./model.js").DocumentRecord
+  currentDocument: import("./model.js").DocumentRecord,
 ): DocumentState {
   // 1. Si piden el estado actual (por ID de documento), lo devolvemos directamente.
   if (targetStateId === currentDocument.id) {
@@ -505,13 +582,18 @@ export function reconstructVersion(
       compositionEntryIds: [],
       capturedAt: new Date().toISOString(),
       documentUpdatedAt: currentDocument.updatedAt,
-      referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} }
+      referenceStatus: {
+        relations: {},
+        tagAssignments: {},
+        authorNotes: {},
+        compositionEntries: {},
+      },
     };
   }
 
   const target = versions.find((v) => v.id === targetStateId);
-  if (!target) throw new Error("El estado solicitado no existe en el historial.");
-
+  if (!target)
+    throw new Error("El estado solicitado no existe en el historial.");
 
   // 2. Si es un estado conservado (pinned), lo devolvemos directamente.
   if (target.pinned) {
@@ -521,31 +603,38 @@ export function reconstructVersion(
       title: target.title,
       text: target.text,
       kind: target.kind as DocumentState["kind"],
-      order: target.order,    
+      order: target.order,
       relationIds: target.relationIds ?? [],
       tagAssignmentKeys: target.tagAssignmentKeys ?? [],
       authorNoteIds: target.authorNoteIds ?? [],
       compositionEntryIds: target.compositionEntryIds ?? [],
       capturedAt: target.capturedAt,
       documentUpdatedAt: target.documentUpdatedAt,
-      referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} }
+      referenceStatus: {
+        relations: {},
+        tagAssignments: {},
+        authorNotes: {},
+        compositionEntries: {},
+      },
     };
     if (target.contentHash && contentHash(state) !== target.contentHash) {
-      throw new Error(`La versión ${target.id} está corrupta: el contentHash no coincide.`);
+      throw new Error(
+        `La versión ${target.id} está corrupta: el contentHash no coincide.`,
+      );
     }
     return state;
   }
 
- 
-  
-    // 3. Es un delta. Reconstruimos desde su base.
+  // 3. Es un delta. Reconstruimos desde su base.
   const base = versions.find((v) => v.id === target.baseStateId);
   if (!base) {
-    throw new Error(`No se puede reconstruir la versión ${target.id}: su base (${target.baseStateId}) no existe.`);
+    throw new Error(
+      `No se puede reconstruir la versión ${target.id}: su base (${target.baseStateId}) no existe.`,
+    );
   }
 
   // El estado inicial es la base (si es pinned, su contenido; si no, hay que reconstruirla también)
-    // El estado inicial es la base (si es pinned, su contenido; si no, hay que reconstruirla también)
+  // El estado inicial es la base (si es pinned, su contenido; si no, hay que reconstruirla también)
   let currentState: DocumentState = {
     documentId: base.documentId,
     projectId: base.projectId,
@@ -559,7 +648,12 @@ export function reconstructVersion(
     compositionEntryIds: base.compositionEntryIds ?? [],
     capturedAt: base.capturedAt,
     documentUpdatedAt: base.documentUpdatedAt,
-    referenceStatus: { relations: {}, tagAssignments: {}, authorNotes: {}, compositionEntries: {} }
+    referenceStatus: {
+      relations: {},
+      tagAssignments: {},
+      authorNotes: {},
+      compositionEntries: {},
+    },
   };
 
   // Aplicamos los changes del target sobre la base
@@ -569,44 +663,38 @@ export function reconstructVersion(
 
   // Verificación de hashes
   if (target.contentHash && contentHash(currentState) !== target.contentHash) {
-    throw new Error(`La versión ${target.id} está corrupta: el contentHash no coincide.`);
+    throw new Error(
+      `La versión ${target.id} está corrupta: el contentHash no coincide.`,
+    );
   }
- 
-
-
-
-
-
-
-    
-  
 
   // Verificación de hashes al final
   if (target.contentHash && contentHash(currentState) !== target.contentHash) {
-    throw new Error(`La versión ${target.id} está corrupta: el contentHash no coincide.`);
+    throw new Error(
+      `La versión ${target.id} está corrupta: el contentHash no coincide.`,
+    );
   }
   if (target.referenceHash) {
     const expectedRefs = {
       relationIds: target.relationIds ?? [],
       tagAssignmentKeys: target.tagAssignmentKeys ?? [],
       authorNoteIds: target.authorNoteIds ?? [],
-      compositionEntryIds: target.compositionEntryIds ?? []
+      compositionEntryIds: target.compositionEntryIds ?? [],
     };
     if (referenceHash(expectedRefs) !== target.referenceHash) {
-      throw new Error(`La versión ${target.id} está corrupta: el referenceHash no coincide.`);
+      throw new Error(
+        `La versión ${target.id} está corrupta: el referenceHash no coincide.`,
+      );
     }
   }
 
   // Calcular referenceStatus comparando con el documento actual
-  currentState.referenceStatus = computeReferenceStatus(
-    currentState,
-    {
-      relationIds: [], // En un caso real, el servicio pasaría las referencias actuales del proyecto
-      tagAssignmentKeys: [],
-      authorNoteIds: [],
-      compositionEntryIds: []
-    }
-  );
+  currentState.referenceStatus = computeReferenceStatus(currentState, {
+    relationIds: [], // En un caso real, el servicio pasaría las referencias actuales del proyecto
+    tagAssignmentKeys: [],
+    authorNoteIds: [],
+    compositionEntryIds: [],
+  });
 
   return currentState;
 }
@@ -623,13 +711,13 @@ export function computeReferenceStatus(
     tagAssignmentKeys: string[];
     authorNoteIds: Id[];
     compositionEntryIds: Id[];
-  }
+  },
 ): DocumentState["referenceStatus"] {
   const status: DocumentState["referenceStatus"] = {
     relations: {},
     tagAssignments: {},
     authorNotes: {},
-    compositionEntries: {}
+    compositionEntries: {},
   };
 
   const currentRelations = new Set(currentReferences.relationIds);
@@ -653,8 +741,6 @@ export function computeReferenceStatus(
   return status;
 }
 
-
-
 /**
  * Informa sobre las relaciones activas que tocan un estado del historial.
  *
@@ -668,7 +754,7 @@ export function computeReferenceStatus(
 export function canDeleteVersion(
   versions: DocumentVersion[],
   relations: VersionRelation[],
-  stateId: Id
+  stateId: Id,
 ): {
   allowed: boolean;
   reason?: string;
@@ -689,7 +775,7 @@ export function canDeleteVersion(
     return {
       allowed: false,
       reason: "La versión solicitada no existe en el historial.",
-      blockingRelations: []
+      blockingRelations: [],
     };
   }
 
@@ -709,7 +795,7 @@ export function canDeleteVersion(
       fromLabel: versionsById.get(r.fromStateId)?.label,
       fromTitle: versionsById.get(r.fromStateId)?.title,
       toLabel: versionsById.get(r.toStateId)?.label,
-      toTitle: versionsById.get(r.toStateId)?.title
+      toTitle: versionsById.get(r.toStateId)?.title,
     }));
 
   return { allowed: true, blockingRelations };
@@ -722,7 +808,7 @@ export function canDeleteVersion(
  */
 export function validateRelations(
   relations: VersionRelation[],
-  versions: DocumentVersion[]
+  versions: DocumentVersion[],
 ): void {
   const stateIds = new Set(versions.map((v) => v.id));
   const relationKeys = new Set<string>();
@@ -730,21 +816,29 @@ export function validateRelations(
   for (const relation of relations) {
     // 1. Extremos deben existir
     if (!stateIds.has(relation.fromStateId)) {
-      throw new Error(`La relación ${relation.id} apunta a un extremo de origen inexistente (${relation.fromStateId}).`);
+      throw new Error(
+        `La relación ${relation.id} apunta a un extremo de origen inexistente (${relation.fromStateId}).`,
+      );
     }
     if (!stateIds.has(relation.toStateId)) {
-      throw new Error(`La relación ${relation.id} apunta a un extremo de destino inexistente (${relation.toStateId}).`);
+      throw new Error(
+        `La relación ${relation.id} apunta a un extremo de destino inexistente (${relation.toStateId}).`,
+      );
     }
 
     // 2. No puede conectar un estado consigo mismo
     if (relation.fromStateId === relation.toStateId) {
-      throw new Error(`La relación ${relation.id} conecta un estado consigo mismo (${relation.fromStateId}).`);
+      throw new Error(
+        `La relación ${relation.id} conecta un estado consigo mismo (${relation.fromStateId}).`,
+      );
     }
 
     // 3. No puede haber relaciones duplicadas entre los mismos extremos
     const key = `${relation.fromStateId}->${relation.toStateId}`;
     if (relationKeys.has(key)) {
-      throw new Error(`Existe una relación duplicada entre ${relation.fromStateId} y ${relation.toStateId}.`);
+      throw new Error(
+        `Existe una relación duplicada entre ${relation.fromStateId} y ${relation.toStateId}.`,
+      );
     }
     relationKeys.add(key);
   }
@@ -779,8 +873,9 @@ export function validateRelations(
 
   for (const stateId of stateIds) {
     if (hasCycle(stateId)) {
-      throw new Error("El historial contiene un ciclo en la cadena de relaciones.");
+      throw new Error(
+        "El historial contiene un ciclo en la cadena de relaciones.",
+      );
     }
   }
-  
 }

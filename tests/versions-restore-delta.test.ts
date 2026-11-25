@@ -6,11 +6,16 @@ describe("restauración de versiones con relaciones", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
 
     await service.restoreDocumentVersion(document.id, first.id);
     const restored = await service.getDocument(document.id);
@@ -21,11 +26,16 @@ describe("restauración de versiones con relaciones", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
     const second = await service.saveDocumentVersion(document.id);
 
     await service.restoreDocumentVersion(document.id, first.id);
@@ -44,54 +54,71 @@ describe("restauración de versiones con relaciones", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const entityOld = await service.createKnowledgeEntity({
-      projectId: project.id, kind: "concept", title: "Vieja"
+      projectId: project.id,
+      kind: "concept",
+      title: "Vieja",
     });
     const relationOld = await service.createRelation({
       projectId: project.id,
-      fromId: document.id, fromType: "document",
-      toId: entityOld.id, toType: "entity",
-      kind: "mentions"
+      fromId: document.id,
+      fromType: "document",
+      toId: entityOld.id,
+      toType: "entity",
+      kind: "mentions",
     });
     const version = await service.saveDocumentVersion(document.id);
 
     const entityNew = await service.createKnowledgeEntity({
-      projectId: project.id, kind: "concept", title: "Nueva"
+      projectId: project.id,
+      kind: "concept",
+      title: "Nueva",
     });
     const relationNew = await service.createRelation({
       projectId: project.id,
-      fromId: document.id, fromType: "document",
-      toId: entityNew.id, toType: "entity",
-      kind: "mentions"
+      fromId: document.id,
+      fromType: "document",
+      toId: entityNew.id,
+      toType: "entity",
+      kind: "mentions",
     });
 
     await service.restoreDocumentVersion(document.id, version.id);
 
     const relations = await service.listRelations(project.id);
     expect(relations.map((r) => r.id).sort()).toEqual(
-      [relationOld.id, relationNew.id].sort()
+      [relationOld.id, relationNew.id].sort(),
     );
   });
 });
-  describe("restauración: etiqueta de la salvaguarda previa", () => {
+describe("restauración: etiqueta de la salvaguarda previa", () => {
   it("restoreDocumentVersion guarda el estado actual con la etiqueta solicitada", async () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
 
     await service.restoreDocumentVersion(document.id, first.id, {
-      label: "Antes de volver a A (prueba)"
+      label: "Antes de volver a A (prueba)",
     });
 
     const versions = await service.listDocumentVersions(document.id);
-    const guard = versions.find((v) => v.label === "Antes de volver a A (prueba)");
+    const guard = versions.find(
+      (v) => v.label === "Antes de volver a A (prueba)",
+    );
     expect(guard).toBeDefined();
     expect(guard!.text).toBe("Estado B.");
   });
@@ -100,11 +127,16 @@ describe("restauración de versiones con relaciones", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
 
     await service.restoreDocumentVersion(document.id, first.id);
 

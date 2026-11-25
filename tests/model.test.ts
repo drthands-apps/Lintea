@@ -10,9 +10,9 @@ describe("relaciones", () => {
         fromType: "fragment",
         toId: "entity-1",
         toType: "entity",
-        kind: "mentions"
+        kind: "mentions",
       },
-      () => new Date("2026-01-02T03:04:05.000Z")
+      () => new Date("2026-01-02T03:04:05.000Z"),
     );
 
     expect(relation.id).toBeTruthy();
@@ -21,24 +21,28 @@ describe("relaciones", () => {
   });
 
   it("rechaza una relación sin identificadores", () => {
-    expect(() => createRelation({
-      projectId: "project-1",
-      fromId: " ",
-      fromType: "fragment",
-      toId: "entity-1",
-      toType: "entity",
-      kind: "mentions"
-    })).toThrow();
+    expect(() =>
+      createRelation({
+        projectId: "project-1",
+        fromId: " ",
+        fromType: "fragment",
+        toId: "entity-1",
+        toType: "entity",
+        kind: "mentions",
+      }),
+    ).toThrow();
   });
 
   it("rechaza una relación de un elemento consigo mismo", () => {
-    expect(() => createRelation({
-      projectId: "project-1",
-      fromId: "same",
-      fromType: "entity",
-      toId: "same",
-      toType: "entity",
-      kind: "related_to"
-    })).toThrow();
+    expect(() =>
+      createRelation({
+        projectId: "project-1",
+        fromId: "same",
+        fromType: "entity",
+        toId: "same",
+        toType: "entity",
+        kind: "related_to",
+      }),
+    ).toThrow();
   });
 });

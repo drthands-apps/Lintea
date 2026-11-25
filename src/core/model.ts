@@ -33,22 +33,15 @@ export const relationKindLabels: Record<RelationKind, string> = {
   supported_by: "Está sustentado por",
   contradicts: "Contradice",
   related_to: "Relacionado con",
-  inspired_by: "Inspirado en"
+  inspired_by: "Inspirado en",
 };
 
 export type DocumentKind = "chapter" | "fragment" | "note";
 
 export type ProjectKind =
-  | "fiction"
-  | "research"
-  | "essay"
-  | "report"
-  | "documentation"
-  | "other";
+  "fiction" | "research" | "essay" | "report" | "documentation" | "other";
 
-export type EditorialStyle =
-  | "classic"
-  | "modern";
+export type EditorialStyle = "classic" | "modern";
 
 export interface ProjectContext {
   kind: ProjectKind;
@@ -140,7 +133,8 @@ export interface SourceRecord {
   order?: number;
 }
 
-export type RelationTargetType = "document" | "fragment" | "entity" | "source" | "event";
+export type RelationTargetType =
+  "document" | "fragment" | "entity" | "source" | "event";
 
 export interface Relation {
   id: Id;
@@ -190,19 +184,23 @@ export function createId(): Id {
 
 export function createRelation(
   input: Omit<Relation, "id" | "createdAt">,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): Relation {
   if (!input.fromId.trim() || !input.toId.trim()) {
-    throw new Error("Una relación necesita identificadores de origen y destino.");
+    throw new Error(
+      "Una relación necesita identificadores de origen y destino.",
+    );
   }
 
   if (input.fromId === input.toId && input.fromType === input.toType) {
-    throw new Error("Una relación no puede conectar un elemento consigo mismo.");
+    throw new Error(
+      "Una relación no puede conectar un elemento consigo mismo.",
+    );
   }
 
   return {
     ...input,
     id: createId(),
-    createdAt: now().toISOString()
+    createdAt: now().toISOString(),
   };
 }

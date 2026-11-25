@@ -6,7 +6,6 @@ Versión 0.1 · Documento de trabajo · 26 de octubre de 2026
 
 > Documento de referencia vivo. Actualizarlo cuando cambien decisiones importantes.
 
-
 ## 1. Propósito y visión
 
 Lintea es una mesa de trabajo local-first para escribir, investigar, documentar y relacionar conocimiento. No busca escribir en lugar de las personas, sino ayudarlas a recordar, conectar, comprender, comprobar y perfeccionar aquello que quieren escribir.
@@ -14,7 +13,6 @@ Lintea es una mesa de trabajo local-first para escribir, investigar, documentar 
 El texto no vive aislado: forma parte de un conjunto de ideas, referencias y decisiones que el usuario puede consultar mientras trabaja.
 
 Principio rector: «No construir un programa que escriba por las personas, sino uno que les permita recordar, relacionar, comprender y perfeccionar todo aquello que quieren escribir».
-
 
 ## 2. Horizonte ideológico y principios
 
@@ -30,7 +28,6 @@ Libertad y portabilidad: priorizar software libre, formatos abiertos, documentac
 
 Honestidad técnica: las alertas de coherencia son pistas para revisar, no verdades definitivas. La ausencia de alertas no garantiza que el contenido sea correcto.
 
-
 ## 3. Público objetivo y usos
 
 Público principal: escritores de ficción y no ficción, ensayistas, investigadores independientes, estudiantes, periodistas, divulgadores, guionistas y personas que trabajan con grandes cantidades de información relacionada.
@@ -42,7 +39,6 @@ Investigación y no ficción: fuentes bibliográficas, citas, documentos, notas 
 Escritura profesional o documental: documentación de proyectos, informes, materiales de referencia e historial de decisiones.
 
 La aplicación no debe dar por sentado que todos escriben novelas. El mismo modelo fundamental debe servir para distintos tipos de proyecto.
-
 
 ## 4. Experiencia de uso y diseño
 
@@ -57,7 +53,6 @@ Vistas complementarias: el tablero visual representa el mismo conocimiento, no u
 Revelación progresiva: mostrar primero lo necesario y reservar funciones avanzadas para cuando se soliciten.
 
 Accesibilidad: contemplar navegación por teclado, contraste, escalado de texto, distintos tamaños de ventana e internacionalización, empezando por español.
-
 
 ## 4.1. Decisiones de producto derivadas del análisis de la competencia
 
@@ -137,7 +132,6 @@ Los documentos podrán incluirse o excluirse de perfiles de publicación y reord
 
 Preferencias iniciales para diseñar: skin del texto; tema de interfaz; corrección automática activada/desactivada; visibilidad de contadores y tipo de recuento; orden de paneles/secciones. Las preferencias visuales se aplican en conjunto mediante presets y no exponen controles para editar CSS dentro de Lintea.
 
-
 ## 6. Modelo conceptual de datos
 
 Entidades iniciales: Project, Document, Fragment, Entity, Source, Relation, Annotation, Event, CompositionEntry, Tag, TagAssignment y Version. Se pueden ajustar, pero los identificadores estables son fundamentales.
@@ -151,7 +145,6 @@ No identificar fragmentos solo por posiciones de caracteres. Usar identificadore
 Editor, panel contextual, cronología y tablero son vistas del mismo conjunto de datos, evitando copias divergentes.
 
 El esquema y el formato de proyecto deben versionarse y documentarse.
-
 
 ## 7. Arquitectura y tecnología
 
@@ -167,7 +160,6 @@ Módulos previstos: core, storage, editor, library, relations, timeline, version
 
 Regla de dependencias: core no importa React, SQLite, Tauri ni SDK de IA. Las integraciones deben poder sustituirse o desactivarse.
 
-
 ## 8. Privacidad, licencias y sostenibilidad
 
 Objetivo: software libre y gratuito, con licencia de código abierto por decidir tras revisar necesidades de contribución y compatibilidad. No declarar licencia hasta comprobar dependencias y tomar la decisión expresamente.
@@ -179,7 +171,6 @@ Revisar licencias de dependencias, iconos, fuentes, bibliotecas de exportación 
 Sostenibilidad posible: contribuciones comunitarias, donaciones o patrocinio voluntario, sin bloquear funciones esenciales tras una suscripción.
 
 Sin telemetría por defecto. Los datos de proyectos no se comparten con servicios externos sin una acción clara del usuario.
-
 
 ## 9. Plan por fases
 
@@ -209,7 +200,6 @@ La estrategia de sincronización sigue abierta: servidor intermedio, conexión P
 
 Los hitos se deciden por pruebas verificables, no solo por calendario. Las estimaciones son orientativas: una versión útil puede requerir muchos meses y una madura, años, especialmente aprendiendo a la vez.
 
-
 ## 10. Prueba inicial de aceptación
 
 Crear un proyecto de prueba, un documento con dos fragmentos, una ficha de personaje o concepto y una fuente. Vincular un fragmento con ambos.
@@ -219,7 +209,6 @@ Editar el fragmento, incluso antes y dentro del anclaje. La relación debe conse
 Guardar, cerrar y reabrir. Verificar que documentos, identificadores y relaciones persisten. Exportar y comprobar que se pueden reconstruir los vínculos.
 
 Éxito: no perder silenciosamente texto ni relaciones, no cambiar originales automáticamente, mostrar errores comprensibles y permitir recuperación.
-
 
 ## 11. Calidad y forma de trabajo
 
@@ -232,7 +221,6 @@ Mantener decisiones técnicas en docs/, tareas pequeñas en un registro y códig
 Ritmo sugerido para sesiones de 3–4 horas: planificar; implementar una tarea acotada; probar y estudiar el código; registrar cambios, comprobaciones y siguiente paso.
 
 Priorizar fiabilidad, relaciones duraderas, recuperación, exportación y privacidad antes que muchas funciones llamativas.
-
 
 ## 12. Evolución y decisiones pendientes
 
@@ -262,7 +250,6 @@ Una etiqueta aplicada a un capítulo completo puede ser demasiado amplia en manu
 Antes de añadir una función, preguntar: ¿ayuda a escribir, recordar, relacionar, comprobar o exportar? ¿Puede funcionar localmente? ¿Respeta el control del autor? ¿Se puede probar? ¿Añade dependencia o coste? ¿Conviene integrar una herramienta existente?
 
 Toda ampliación debe mantener una vía de salida: exportación completa, identificadores documentados, versiones recuperables y posibilidad de trabajar sin servicios externos.
-
 
 ## 13. Glosario
 

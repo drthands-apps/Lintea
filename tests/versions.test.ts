@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DocumentRecord } from "../src/core/model.js";
 import {
   createDocumentVersion,
-  restoreDocumentVersion
+  restoreDocumentVersion,
 } from "../src/core/versions.js";
 
 const document: DocumentRecord = {
@@ -11,7 +11,7 @@ const document: DocumentRecord = {
   title: "Primer borrador",
   text: "Una idea que después descarté.",
   createdAt: "2026-01-01T10:00:00.000Z",
-  updatedAt: "2026-01-01T10:00:00.000Z"
+  updatedAt: "2026-01-01T10:00:00.000Z",
 };
 
 describe("versiones de documentos", () => {
@@ -19,7 +19,7 @@ describe("versiones de documentos", () => {
     const version = createDocumentVersion(
       document,
       { label: "Primera idea" },
-      () => new Date("2026-01-02T10:00:00.000Z")
+      () => new Date("2026-01-02T10:00:00.000Z"),
     );
 
     expect(version.documentId).toBe(document.id);
@@ -33,7 +33,7 @@ describe("versiones de documentos", () => {
   it("omite etiquetas y notas vacías", () => {
     const version = createDocumentVersion(document, {
       label: "   ",
-      note: ""
+      note: "",
     });
 
     expect(version.label).toBeUndefined();
@@ -69,13 +69,13 @@ describe("versiones de documentos", () => {
       ...document,
       title: "Nueva dirección",
       text: "La historia tomó otro camino.",
-      updatedAt: "2026-01-03T10:00:00.000Z"
+      updatedAt: "2026-01-03T10:00:00.000Z",
     };
 
     const restored = restoreDocumentVersion(
       current,
       version,
-      () => new Date("2026-01-04T10:00:00.000Z")
+      () => new Date("2026-01-04T10:00:00.000Z"),
     );
 
     expect(restored.title).toBe("Primer borrador");
@@ -99,10 +99,11 @@ describe("versiones de documentos", () => {
     const version = createDocumentVersion(document);
     const otherDocument = {
       ...document,
-      id: "document-2"
+      id: "document-2",
     };
 
-    expect(() => restoreDocumentVersion(otherDocument, version))
-      .toThrow("La versión no pertenece al documento que se quiere recuperar.");
+    expect(() => restoreDocumentVersion(otherDocument, version)).toThrow(
+      "La versión no pertenece al documento que se quiere recuperar.",
+    );
   });
 });

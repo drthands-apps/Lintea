@@ -10,10 +10,10 @@ function doc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     title: "Actual",
     text: "Actual",
     kind: "note",
-    order: 0, 
+    order: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -24,11 +24,11 @@ function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     projectId: "p",
     title: "Título",
     text: "Texto",
-    kind: "note",       
-    order: 0,           
+    kind: "note",
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -40,10 +40,10 @@ function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     title: "Antigua",
     text: "Antigua",
     kind: "note",
-    order: 0,  
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -55,7 +55,7 @@ function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
     fromStateId: "s1",
     toStateId: "s2",
     capturedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -76,7 +76,12 @@ describe("integridad de contenido del historial", () => {
       pinned: true,
       title: "Antigua",
       text: "Antigua",
-      contentHash: contentHash({ title: "Antigua", text: "Antigua", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "Antigua",
+        text: "Antigua",
+        kind: "note",
+        order: 0,
+      }),
     });
     const result = reconstructVersion([old], [], "s1", current);
     expect(result.title).toBe("Antigua");
@@ -90,7 +95,12 @@ describe("integridad de contenido del historial", () => {
       pinned: true,
       title: "B",
       text: "B",
-      contentHash: contentHash({ title: "B", text: "B", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "B",
+        text: "B",
+        kind: "note",
+        order: 0,
+      }),
     });
     const target = state({
       id: "target",
@@ -99,14 +109,24 @@ describe("integridad de contenido del historial", () => {
       baseStateId: "base",
       changes: [
         { kind: "title", from: "B", to: "A" },
-        { kind: "text", from: "B", to: "A", hunks: [] }
+        { kind: "text", from: "B", to: "A", hunks: [] },
       ],
-      contentHash: contentHash({ title: "A", text: "A", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "A",
+        text: "A",
+        kind: "note",
+        order: 0,
+      }),
     });
     const relations = [
-      relation({ id: "r1", fromStateId: "base", toStateId: "target" })
+      relation({ id: "r1", fromStateId: "base", toStateId: "target" }),
     ];
-    const result = reconstructVersion([base, target], relations, "target", current);
+    const result = reconstructVersion(
+      [base, target],
+      relations,
+      "target",
+      current,
+    );
     expect(result.title).toBe("A");
     expect(result.text).toBe("A");
   });
@@ -118,9 +138,11 @@ describe("integridad de contenido del historial", () => {
       pinned: true,
       title: "Antigua",
       text: "Antigua",
-      contentHash: "hash-incorrecto"
+      contentHash: "hash-incorrecto",
     });
-    expect(() => reconstructVersion([corrupted], [], "s1", current)).toThrow(/corrupto|corrupta/);
+    expect(() => reconstructVersion([corrupted], [], "s1", current)).toThrow(
+      /corrupto|corrupta/,
+    );
   });
 
   it("rechaza reconstruir un delta cuya base no existe", () => {
@@ -132,14 +154,23 @@ describe("integridad de contenido del historial", () => {
       baseStateId: "no-existe",
       changes: [{ kind: "title", from: "Actual", to: "Antigua" }],
       baseMissing: true,
-      contentHash: contentHash({ title: "Antigua", text: "Antigua", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "Antigua",
+        text: "Antigua",
+        kind: "note",
+        order: 0,
+      }),
     });
-    expect(() => reconstructVersion([orphan], [], "s1", current)).toThrow(/base|reconstru/i);
+    expect(() => reconstructVersion([orphan], [], "s1", current)).toThrow(
+      /base|reconstru/i,
+    );
   });
 
   it("rechaza reconstruir un estado que no existe en el historial", () => {
     const current = doc();
-    expect(() => reconstructVersion([], [], "no-existe", current)).toThrow(/no existe|no encontrad/i);
+    expect(() => reconstructVersion([], [], "no-existe", current)).toThrow(
+      /no existe|no encontrad/i,
+    );
   });
 
   it("prefiere un camino íntegro si otro está corrupto", () => {
@@ -149,19 +180,29 @@ describe("integridad de contenido del historial", () => {
       pinned: true,
       title: "A",
       text: "A",
-      contentHash: contentHash({ title: "A", text: "A", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "A",
+        text: "A",
+        kind: "note",
+        order: 0,
+      }),
     });
     const b = state({
       id: "b",
       pinned: true,
       title: "B",
       text: "B",
-      contentHash: contentHash({ title: "B", text: "B", kind: "note", order: 0 })
+      contentHash: contentHash({
+        title: "B",
+        text: "B",
+        kind: "note",
+        order: 0,
+      }),
     });
     // Camino 1: a → b (válido). Camino 2: b → d (corrupto).
     // El target es b; debe elegir el camino válido desde a.
     const relations = [
-      relation({ id: "r1", fromStateId: "a", toStateId: "b" })
+      relation({ id: "r1", fromStateId: "a", toStateId: "b" }),
     ];
     const result = reconstructVersion([a, b], relations, "b", current);
     expect(result.title).toBe("B");

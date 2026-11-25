@@ -1,10 +1,9 @@
-
 import type {
   DocumentRecord,
   DocumentKind,
   Id,
   Project,
-  ProjectContext
+  ProjectContext,
 } from "./model.js";
 import { createId } from "./model.js";
 
@@ -49,27 +48,27 @@ function copyProjectContext(context?: ProjectContext): ProjectContext {
       kind: "other",
       primaryLanguage: "und",
       additionalLanguages: [],
-      editorialStyle: "classic"
+      editorialStyle: "classic",
     };
   }
 
   const primaryLanguage = requireText(
     context.primaryLanguage,
-    "El idioma principal"
+    "El idioma principal",
   );
 
   return {
     ...context,
     primaryLanguage,
     additionalLanguages: context.additionalLanguages.map((language) =>
-      requireText(language, "El idioma adicional")
-    )
+      requireText(language, "El idioma adicional"),
+    ),
   };
 }
 
 export function createProject(
   input: CreateProjectInput,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): Project {
   const timestamp = requireValidDate(now());
 
@@ -78,7 +77,7 @@ export function createProject(
     title: requireText(input.title, "El título del proyecto"),
     createdAt: timestamp,
     updatedAt: timestamp,
-    context: copyProjectContext(input.context)
+    context: copyProjectContext(input.context),
   };
 }
 
@@ -91,11 +90,9 @@ export function updateProject(
   projects: Project[],
   projectId: Id,
   changes: UpdateProjectInput,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): Project[] {
-  const index = projects.findIndex(
-    (project) => project.id === projectId
-  );
+  const index = projects.findIndex((project) => project.id === projectId);
 
   if (index === -1) {
     throw new Error("No se puede actualizar un proyecto que no existe.");
@@ -115,16 +112,16 @@ export function updateProject(
 
   const currentContext = copyProjectContext(current.context);
 
-const sameContext =
-  context.kind === currentContext.kind &&
-  context.primaryLanguage === currentContext.primaryLanguage &&
-  context.editorialStyle === currentContext.editorialStyle &&
-  context.additionalLanguages.length ===
-    currentContext.additionalLanguages.length &&
-  context.additionalLanguages.every(
-    (language, index) =>
-      language === currentContext.additionalLanguages[index]
-  );
+  const sameContext =
+    context.kind === currentContext.kind &&
+    context.primaryLanguage === currentContext.primaryLanguage &&
+    context.editorialStyle === currentContext.editorialStyle &&
+    context.additionalLanguages.length ===
+      currentContext.additionalLanguages.length &&
+    context.additionalLanguages.every(
+      (language, index) =>
+        language === currentContext.additionalLanguages[index],
+    );
 
   if (title === current.title && sameContext) {
     return projects;
@@ -136,7 +133,7 @@ const sameContext =
     ...current,
     title,
     context,
-    updatedAt
+    updatedAt,
   };
 
   const updatedProjects = [...projects];
@@ -148,14 +145,16 @@ const sameContext =
 export function createDocument(
   input: CreateDocumentInput,
   workspace: ProjectWorkspace,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): DocumentRecord {
   const projectExists = workspace.projects.some(
-    (project) => project.id === input.projectId
+    (project) => project.id === input.projectId,
   );
 
   if (!projectExists) {
-    throw new Error("No se puede crear un documento sin un proyecto existente.");
+    throw new Error(
+      "No se puede crear un documento sin un proyecto existente.",
+    );
   }
 
   const title = requireText(input.title, "El título del documento");
@@ -170,15 +169,17 @@ export function createDocument(
     kind: input.kind ?? "note",
     order: input.order ?? 0,
     createdAt: timestamp,
-    updatedAt: timestamp
+    updatedAt: timestamp,
   };
 }
 
 export function addDocument(
   workspace: ProjectWorkspace,
-  document: DocumentRecord
+  document: DocumentRecord,
 ): ProjectWorkspace {
-  if (!workspace.projects.some((project) => project.id === document.projectId)) {
+  if (
+    !workspace.projects.some((project) => project.id === document.projectId)
+  ) {
     throw new Error("El proyecto del documento no existe.");
   }
 
@@ -189,10 +190,9 @@ export function addDocument(
   return {
     ...workspace,
     projects: [...workspace.projects],
-    documents: [...workspace.documents, document]
+    documents: [...workspace.documents, document],
   };
 }
-
 
 export interface UpdateDocumentInput {
   title?: string;
@@ -205,10 +205,10 @@ export function updateDocument(
   workspace: ProjectWorkspace,
   documentId: Id,
   changes: UpdateDocumentInput,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
 ): ProjectWorkspace {
   const index = workspace.documents.findIndex(
-    (document) => document.id === documentId
+    (document) => document.id === documentId,
   );
 
   if (index === -1) {
@@ -223,10 +223,17 @@ export function updateDocument(
       : requireText(changes.title, "El título del documento");
 
   const text = changes.text === undefined ? current.text : changes.text;
-  const kind = changes.kind === undefined ? current.kind ?? "note" : changes.kind;
-  const order = changes.order === undefined ? current.order ?? 0 : changes.order;
+  const kind =
+    changes.kind === undefined ? (current.kind ?? "note") : changes.kind;
+  const order =
+    changes.order === undefined ? (current.order ?? 0) : changes.order;
 
-  if (title === current.title && text === current.text && kind === (current.kind ?? "note") && order === (current.order ?? 0)) {
+  if (
+    title === current.title &&
+    text === current.text &&
+    kind === (current.kind ?? "note") &&
+    order === (current.order ?? 0)
+  ) {
     return workspace;
   }
 
@@ -238,7 +245,7 @@ export function updateDocument(
     text,
     kind,
     order,
-    updatedAt
+    updatedAt,
   };
 
   const documents = [...workspace.documents];
@@ -247,6 +254,6 @@ export function updateDocument(
   return {
     ...workspace,
     projects: [...workspace.projects],
-    documents
+    documents,
   };
 }

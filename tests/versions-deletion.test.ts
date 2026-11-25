@@ -10,10 +10,10 @@ function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     title: "Título",
     text: "Texto",
     kind: "note",
-    order: 0, 
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -24,11 +24,11 @@ function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     projectId: "p",
     title: "Título",
     text: "Texto",
-    kind: "note",       
-    order: 0,           
+    kind: "note",
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -40,7 +40,7 @@ function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
     fromStateId: "s1",
     toStateId: "s2",
     capturedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -59,8 +59,8 @@ describe("borrado seguro de estados del historial", () => {
         fromStateId: "s1",
         toStateId: "s2",
         label: "Revisión del capítulo 3",
-        capturedAt: "2026-03-18T00:00:00.000Z"
-      })
+        capturedAt: "2026-03-18T00:00:00.000Z",
+      }),
     ];
     const result = canDeleteVersion(versions, relations, "s1");
     expect(result.allowed).toBe(true);
@@ -74,8 +74,8 @@ describe("borrado seguro de estados del historial", () => {
         id: "r1",
         fromStateId: "s1",
         toStateId: "s2",
-        toMissing: true
-      })
+        toMissing: true,
+      }),
     ];
     // La relación ya está interrumpida por el otro extremo; borrar s1
     // solo la marca como fromMissing, no destruye nada vivo.
@@ -91,7 +91,12 @@ describe("borrado seguro de estados del historial", () => {
   it("no bloquea por relaciones marcadas como rechazadas", () => {
     const versions = [state({ id: "s1" }), state({ id: "s2" })];
     const relations = [
-      relation({ id: "r1", fromStateId: "s1", toStateId: "s2", rejected: true })
+      relation({
+        id: "r1",
+        fromStateId: "s1",
+        toStateId: "s2",
+        rejected: true,
+      }),
     ];
     const result = canDeleteVersion(versions, relations, "s1");
     expect(result.allowed).toBe(true);
@@ -101,15 +106,27 @@ describe("borrado seguro de estados del historial", () => {
     const versions = [
       state({ id: "s1" }),
       state({ id: "s2" }),
-      state({ id: "s3" })
+      state({ id: "s3" }),
     ];
     const relations = [
-      relation({ id: "r1", fromStateId: "s1", toStateId: "s2", label: "Primera" }),
-      relation({ id: "r2", fromStateId: "s3", toStateId: "s1", label: "Segunda" })
+      relation({
+        id: "r1",
+        fromStateId: "s1",
+        toStateId: "s2",
+        label: "Primera",
+      }),
+      relation({
+        id: "r2",
+        fromStateId: "s3",
+        toStateId: "s1",
+        label: "Segunda",
+      }),
     ];
     const result = canDeleteVersion(versions, relations, "s1");
     expect(result.allowed).toBe(true);
-    expect(result.blockingRelations.map((r) => r.id).sort()).toEqual(["r1", "r2"]);
-   
+    expect(result.blockingRelations.map((r) => r.id).sort()).toEqual([
+      "r1",
+      "r2",
+    ]);
   });
 });

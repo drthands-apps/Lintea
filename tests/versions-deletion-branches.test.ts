@@ -4,7 +4,7 @@ import { WorkspaceService } from "../src/application/workspace-service.js";
 import {
   canDeleteVersion,
   contentHash,
-  reconstructVersion
+  reconstructVersion,
 } from "../src/core/versions.js";
 import type { DocumentVersion, VersionRelation } from "../src/core/versions.js";
 import type { DocumentRecord } from "../src/core/model.js";
@@ -24,7 +24,7 @@ function version(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -36,7 +36,7 @@ function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
     fromStateId: "s1",
     toStateId: "s2",
     capturedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -50,7 +50,7 @@ function doc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     order: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -62,7 +62,10 @@ function makeClock(start = Date.parse("2026-11-11T10:00:00.000Z")) {
   let t = start;
   return {
     now: () => new Date(t),
-    tick: () => { t += 1000; return new Date(t); }
+    tick: () => {
+      t += 1000;
+      return new Date(t);
+    },
   };
 }
 
@@ -74,7 +77,7 @@ async function setup() {
   const document = await service.createDocument({
     projectId: project.id,
     title: "Doc",
-    text: "v0"
+    text: "v0",
   });
   return { clock, storage, service, project, document };
 }
@@ -84,7 +87,7 @@ async function checkpoint(
   clock: { tick: () => Date },
   docId: string,
   text: string,
-  label?: string
+  label?: string,
 ): Promise<DocumentVersion> {
   await service.updateDocument(docId, { text });
   clock.tick();
@@ -102,7 +105,12 @@ describe("reconstructVersion conserva kind y order", () => {
       pinned: true,
       kind: "fragment",
       order: 3,
-      contentHash: contentHash({ title: "Título", text: "Texto", kind: "fragment", order: 3 })
+      contentHash: contentHash({
+        title: "Título",
+        text: "Texto",
+        kind: "fragment",
+        order: 3,
+      }),
     });
 
     const state = reconstructVersion([pinned], [], pinned.id, base);
@@ -119,7 +127,12 @@ describe("reconstructVersion conserva kind y order", () => {
       kind: "fragment",
       order: 3,
       text: "Texto base",
-      contentHash: contentHash({ title: "Título", text: "Texto base", kind: "fragment", order: 3 })
+      contentHash: contentHash({
+        title: "Título",
+        text: "Texto base",
+        kind: "fragment",
+        order: 3,
+      }),
     });
     const delta = version({
       id: "d1",
@@ -128,8 +141,15 @@ describe("reconstructVersion conserva kind y order", () => {
       text: "Texto delta",
       kind: "fragment",
       order: 3,
-      changes: [{ kind: "text", from: "Texto base", to: "Texto delta", hunks: [] }],
-      contentHash: contentHash({ title: "Título", text: "Texto delta", kind: "fragment", order: 3 })
+      changes: [
+        { kind: "text", from: "Texto base", to: "Texto delta", hunks: [] },
+      ],
+      contentHash: contentHash({
+        title: "Título",
+        text: "Texto delta",
+        kind: "fragment",
+        order: 3,
+      }),
     });
 
     const state = reconstructVersion([delta, pinned], [], delta.id, base);
@@ -147,10 +167,34 @@ describe("reconstructVersion conserva kind y order", () => {
 describe("borrado lineal A→B→C→D", () => {
   async function linear() {
     const ctx = await setup();
-    const A = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v1", "A");
-    const B = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v2", "B");
-    const C = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v3", "C");
-    const D = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v4", "D");
+    const A = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v1",
+      "A",
+    );
+    const B = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v2",
+      "B",
+    );
+    const C = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v3",
+      "C",
+    );
+    const D = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v4",
+      "D",
+    );
     return { ...ctx, A, B, C, D };
   }
   it("canDeleteVersion permite borrar C si sus relaciones están rechazadas", async () => {
@@ -170,4 +214,3 @@ describe("borrado lineal A→B→C→D", () => {
     expect(check2.allowed).toBe(true);
   });
 });
-

@@ -8,7 +8,10 @@ function makeClock(start = Date.parse("2026-11-14T10:00:00.000Z")) {
   let t = start;
   return {
     now: () => new Date(t),
-    tick: () => { t += 1000; return new Date(t); }
+    tick: () => {
+      t += 1000;
+      return new Date(t);
+    },
   };
 }
 
@@ -20,7 +23,7 @@ async function setup() {
   const document = await service.createDocument({
     projectId: project.id,
     title: "Doc",
-    text: "v0"
+    text: "v0",
   });
   return { clock, storage, service, project, document };
 }
@@ -30,7 +33,7 @@ async function checkpoint(
   clock: { tick: () => Date },
   docId: string,
   text: string,
-  label?: string
+  label?: string,
 ): Promise<DocumentVersion> {
   await service.updateDocument(docId, { text });
   clock.tick();
@@ -44,10 +47,34 @@ async function checkpoint(
 describe("ocultar C en A→B→C→D", () => {
   async function linear() {
     const ctx = await setup();
-    const A = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v1", "A");
-    const B = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v2", "B");
-    const C = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v3", "C");
-    const D = await checkpoint(ctx.service, ctx.clock, ctx.document.id, "v4", "D");
+    const A = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v1",
+      "A",
+    );
+    const B = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v2",
+      "B",
+    );
+    const C = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v3",
+      "C",
+    );
+    const D = await checkpoint(
+      ctx.service,
+      ctx.clock,
+      ctx.document.id,
+      "v4",
+      "D",
+    );
     return { ...ctx, A, B, C, D };
   }
 
@@ -55,7 +82,9 @@ describe("ocultar C en A→B→C→D", () => {
     const { service, storage, document, C } = await linear();
     await service.deleteDocumentVersion(document.id, C.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const c = all.find((v) => v.id === C.id);
     expect(c).toBeDefined();
     expect(c!.hidden).toBe(true);
@@ -75,7 +104,9 @@ describe("ocultar C en A→B→C→D", () => {
     const { service, storage, document, C } = await linear();
     await service.deleteDocumentVersion(document.id, C.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     expect(all.some((v) => v.id === C.id)).toBe(true);
   });
 
@@ -83,7 +114,9 @@ describe("ocultar C en A→B→C→D", () => {
     const { service, storage, document, C, D } = await linear();
     await service.deleteDocumentVersion(document.id, C.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const d = all.find((v) => v.id === D.id)!;
     expect(d.hidden).not.toBe(true);
     expect(d.replacedBy).toBeUndefined();
@@ -94,7 +127,9 @@ describe("ocultar C en A→B→C→D", () => {
     const { service, storage, document, C, D } = await linear();
     await service.deleteDocumentVersion(document.id, C.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const relations = await storage.listVersionRelations(document.id);
     const state = reconstructVersion(all, relations, D.id, document);
     expect(state.text).toBe("v4");
@@ -140,7 +175,9 @@ describe("ocultar pinned raíz A", () => {
 
     await service.deleteDocumentVersion(document.id, A.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const a = all.find((v) => v.id === A.id)!;
     expect(a.hidden).toBe(true);
     expect(a.replacedBy).toBeUndefined();
@@ -170,7 +207,9 @@ describe("ocultar B con rama", () => {
     await service.deleteDocumentVersion(document.id, B.id);
     const afterRelations = await storage.listVersionRelations(document.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const b = all.find((v) => v.id === B.id)!;
     expect(b.hidden).toBe(true);
     expect(b.replacedBy).toBeUndefined();
@@ -185,8 +224,12 @@ describe("ocultar B con rama", () => {
     expect(d.replacedBy).toBeUndefined();
 
     // Todo sigue siendo reconstruible.
-    expect(reconstructVersion(all, afterRelations, C.id, document).text).toBe("v3");
-    expect(reconstructVersion(all, afterRelations, D.id, document).text).toBe("v3-rama");
+    expect(reconstructVersion(all, afterRelations, C.id, document).text).toBe(
+      "v3",
+    );
+    expect(reconstructVersion(all, afterRelations, D.id, document).text).toBe(
+      "v3-rama",
+    );
 
     // Relaciones antiguas permanecen sin cambios.
     expect(afterRelations.length).toBe(beforeRelations.length);
@@ -210,16 +253,24 @@ describe("ocultar A en grafo triangular", () => {
 
     await service.deleteDocumentVersion(document.id, A.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const relations = await storage.listVersionRelations(document.id);
 
     for (const v of all) {
-      expect(() => reconstructVersion(all, relations, v.id, document)).not.toThrow();
+      expect(() =>
+        reconstructVersion(all, relations, v.id, document),
+      ).not.toThrow();
     }
     expect(reconstructVersion(all, relations, B.id, document).text).toBe("v2");
     expect(reconstructVersion(all, relations, C.id, document).text).toBe("v3");
-    expect(reconstructVersion(all, relations, A2.id, document).text).toBe("v1-rama");
-    expect(reconstructVersion(all, relations, A3.id, document).text).toBe("v1-rama-2");
+    expect(reconstructVersion(all, relations, A2.id, document).text).toBe(
+      "v1-rama",
+    );
+    expect(reconstructVersion(all, relations, A3.id, document).text).toBe(
+      "v1-rama-2",
+    );
   });
 });
 
@@ -235,7 +286,9 @@ describe("contrato nuevo de ocultación", () => {
 
     await service.deleteDocumentVersion(document.id, B.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const b = all.find((v) => v.id === B.id)!;
     expect(b.hidden).toBe(true);
 
@@ -251,7 +304,9 @@ describe("contrato nuevo de ocultación", () => {
 
     await service.deleteDocumentVersion(document.id, A.id);
 
-    const all = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const all = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     const relations = await storage.listVersionRelations(document.id);
     const a = all.find((v) => v.id === A.id)!;
     expect(a.hidden).toBe(true);
@@ -263,9 +318,13 @@ describe("contrato nuevo de ocultación", () => {
     await checkpoint(service, clock, document.id, "v1", "A");
     const B = await checkpoint(service, clock, document.id, "v2", "B");
 
-    const before = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const before = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
     await service.deleteDocumentVersion(document.id, B.id);
-    const after = await storage.listDocumentVersions(document.id, { includeHidden: true });
+    const after = await storage.listDocumentVersions(document.id, {
+      includeHidden: true,
+    });
 
     expect(after.length).toBe(before.length);
   });

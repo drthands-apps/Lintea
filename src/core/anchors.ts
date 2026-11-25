@@ -1,8 +1,17 @@
 import type { FragmentAnchor } from "./model.js";
 
 export type AnchorResolution =
-  | { status: "resolved"; start: number; end: number; confidence: "high" | "medium" }
-  | { status: "needs-review"; reason: "quote-not-found" | "ambiguous"; candidates: number[] };
+  | {
+      status: "resolved";
+      start: number;
+      end: number;
+      confidence: "high" | "medium";
+    }
+  | {
+      status: "needs-review";
+      reason: "quote-not-found" | "ambiguous";
+      candidates: number[];
+    };
 
 /**
  * Creates a text anchor around a selection in a document.
@@ -15,9 +24,15 @@ export function createFragmentAnchor(
   documentText: string,
   start: number,
   end: number,
-  contextLength = 32
+  contextLength = 32,
 ): FragmentAnchor {
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > documentText.length) {
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end <= start ||
+    end > documentText.length
+  ) {
     throw new Error("La selección del fragmento no es válida.");
   }
 
@@ -31,7 +46,10 @@ export function createFragmentAnchor(
     fragmentId,
     quote,
     prefix: documentText.slice(Math.max(0, start - contextLength), start),
-    suffix: documentText.slice(end, Math.min(documentText.length, end + contextLength))
+    suffix: documentText.slice(
+      end,
+      Math.min(documentText.length, end + contextLength),
+    ),
   };
 }
 
@@ -45,7 +63,7 @@ export function createFragmentAnchor(
  */
 export function resolveFragmentAnchor(
   anchor: Pick<FragmentAnchor, "documentId" | "quote" | "prefix" | "suffix">,
-  currentText: string
+  currentText: string,
 ): AnchorResolution {
   const candidates: number[] = [];
   let fromIndex = 0;
@@ -58,26 +76,37 @@ export function resolveFragmentAnchor(
   }
 
   if (candidates.length === 0) {
-    return { status: "needs-review", reason: "quote-not-found", candidates: [] };
+    return {
+      status: "needs-review",
+      reason: "quote-not-found",
+      candidates: [],
+    };
   }
 
   if (candidates.length === 1) {
     const start = candidates[0]!;
-    return { status: "resolved", start, end: start + anchor.quote.length, confidence: "high" };
+    return {
+      status: "resolved",
+      start,
+      end: start + anchor.quote.length,
+      confidence: "high",
+    };
   }
 
-  const scored = candidates.map((start) => {
-    const end = start + anchor.quote.length;
-    const prefixMatch = commonSuffixLength(
-      currentText.slice(Math.max(0, start - anchor.prefix.length), start),
-      anchor.prefix
-    );
-    const suffixMatch = commonPrefixLength(
-      currentText.slice(end, end + anchor.suffix.length),
-      anchor.suffix
-    );
-    return { start, score: prefixMatch + suffixMatch };
-  }).sort((a, b) => b.score - a.score);
+  const scored = candidates
+    .map((start) => {
+      const end = start + anchor.quote.length;
+      const prefixMatch = commonSuffixLength(
+        currentText.slice(Math.max(0, start - anchor.prefix.length), start),
+        anchor.prefix,
+      );
+      const suffixMatch = commonPrefixLength(
+        currentText.slice(end, end + anchor.suffix.length),
+        anchor.suffix,
+      );
+      return { start, score: prefixMatch + suffixMatch };
+    })
+    .sort((a, b) => b.score - a.score);
 
   const best = scored[0]!;
   const second = scored[1];
@@ -88,20 +117,24 @@ export function resolveFragmentAnchor(
       status: "resolved",
       start: best.start,
       end: best.start + anchor.quote.length,
-      confidence: "medium"
+      confidence: "medium",
     };
   }
 
   return {
     status: "needs-review",
     reason: "ambiguous",
-    candidates
+    candidates,
   };
 }
 
 function commonSuffixLength(a: string, b: string): number {
   let count = 0;
-  while (count < a.length && count < b.length && a[a.length - 1 - count] === b[b.length - 1 - count]) {
+  while (
+    count < a.length &&
+    count < b.length &&
+    a[a.length - 1 - count] === b[b.length - 1 - count]
+  ) {
     count++;
   }
   return count;

@@ -6,7 +6,9 @@ describe("guardado de versiones con deltas", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const version = await service.saveDocumentVersion(document.id);
     expect(version.pinned).toBe(true);
@@ -20,11 +22,16 @@ describe("guardado de versiones con deltas", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
     const second = await service.saveDocumentVersion(document.id);
 
     expect(second.pinned).toBeFalsy();
@@ -37,7 +44,9 @@ describe("guardado de versiones con deltas", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
     const second = await service.saveDocumentVersion(document.id);
@@ -48,14 +57,22 @@ describe("guardado de versiones con deltas", () => {
     const { service } = createTestService();
     const project = await service.createProject({ title: "P" });
     const document = await service.createDocument({
-      projectId: project.id, title: "Borrador", text: "Estado A."
+      projectId: project.id,
+      title: "Borrador",
+      text: "Estado A.",
     });
     const first = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado B." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado B.",
+    });
     const second = await service.saveDocumentVersion(document.id);
 
-    await service.updateDocument(document.id, { title: "Borrador", text: "Estado A." });
+    await service.updateDocument(document.id, {
+      title: "Borrador",
+      text: "Estado A.",
+    });
     const third = await service.saveDocumentVersion(document.id);
 
     // En el modelo v0.2, volver a A puede crear un estado nuevo (delta)

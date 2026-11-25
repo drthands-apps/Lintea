@@ -9,10 +9,10 @@ function state(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
     title: "Título",
     text: "Texto",
     kind: "note",
-    order: 0, 
+    order: 0,
     capturedAt: "2026-01-01T00:00:00.000Z",
     documentUpdatedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -24,7 +24,7 @@ function relation(overrides: Partial<VersionRelation> = {}): VersionRelation {
     fromStateId: "s1",
     toStateId: "s2",
     capturedAt: "2026-01-01T00:00:00.000Z",
-    ...overrides
+    ...overrides,
   };
 }
 

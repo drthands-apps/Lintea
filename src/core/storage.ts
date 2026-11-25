@@ -1,4 +1,3 @@
-
 import type {
   CompositionEntry,
   AuthorNote,
@@ -9,12 +8,9 @@ import type {
   Relation,
   SourceRecord,
   Tag,
-  TagAssignment
+  TagAssignment,
 } from "./model.js";
-import type {
-   DocumentVersion,
-   VersionRelation
-} from "./versions.js";
+import type { DocumentVersion, VersionRelation } from "./versions.js";
 
 export interface ProjectStorage {
   listProjects(): Promise<Project[]>;
@@ -46,7 +42,10 @@ export interface ProjectStorage {
   createAuthorNote(note: AuthorNote): Promise<void>;
   updateAuthorNote(note: AuthorNote): Promise<void>;
   deleteAuthorNote(projectId: Id, noteId: Id): Promise<void>;
-  listDocumentVersions(documentId: Id, options?: { includeHidden?: boolean }): Promise<DocumentVersion[]>;
+  listDocumentVersions(
+    documentId: Id,
+    options?: { includeHidden?: boolean },
+  ): Promise<DocumentVersion[]>;
   getDocumentVersion(versionId: Id): Promise<DocumentVersion | null>;
   createDocumentVersion(version: DocumentVersion): Promise<void>;
   deleteDocumentVersion(versionId: Id): Promise<void>;

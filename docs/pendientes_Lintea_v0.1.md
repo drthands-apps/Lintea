@@ -15,13 +15,13 @@ Lista viva de tareas acordadas y no cerradas. Actualizar al cerrar cada una.
   - No tocar relaciones, etiquetas, notas ni composición.
 - [ ] Añadir `deleteDocumentVersion` en `WorkspaceService` usando `canDeleteVersion`.
 - [ ] Decidir si, tras restaurar, los deltas futuros apuntan a `CURRENT_BASE_VERSION_ID`
-  o a la versión restaurada. (Recomendación: `CURRENT_BASE_VERSION_ID`.)
+      o a la versión restaurada. (Recomendación: `CURRENT_BASE_VERSION_ID`.)
 - [ ] Añadir nota en `docs/Modelo_de_historial_v0.1.md` sobre la base sintética
-  y la regla `changes !== undefined`.
+      y la regla `changes !== undefined`.
 
 ## Otras anotaciones
 
 - [ ] Imágenes en fichas de personajes y lugares (avatar/inspiración). No urgente.
 - [ ] Revisar el modelo de datos completo antes de la fase de export LinteaZip,
-  para no rehacer el formato dos veces.
+      para no rehacer el formato dos veces.
 - [ ] `npm run typecheck && npm test` como comprobación antes de cada commit.
