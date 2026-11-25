@@ -97,3 +97,10 @@ Sesión 24 nov (menú contextual de fichas): master en 6771fa3.
 - Pendiente de fichas: imágenes/avatares (requiere migración + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
 - Pendiente de salvaguardas: ventana de diff no bloqueante/arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas; historial visual.
 - Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
+Sesión 25 nov (paleta del diff): master en 52c73f3.
+- Paleta del diff con más contraste e integrada con la interfaz (fondos #f0d6d2 / #d6e8d6, palabras #e8b4ae / #a8d4a8, gutter #e6c2be / #bcd8bc).
+- Eliminado el bloque dark de styles.variables (innecesario con useDarkTheme={false}).
+- Eliminadas highlightBackground y highlightGutterBackground (no se usan en el flujo actual).
+- Confirmado que styles.variables.light funciona; el problema anterior era de contraste, no del componente. El CSS de styles.css que se añadió para forzar colores ya no está.
+- Pendiente de diff: parametrizar la paleta por skin (mover a diffTheme o variables CSS cuando se aborden las skins); si el panel se hace redimensionable, migrar a cabeceras propias con grid + styles.splitView.
+- Sigue pendiente: test de integración con SQLite real; imágenes/avatares en fichas; historial visual (grafo).
