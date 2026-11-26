@@ -104,3 +104,12 @@ Sesión 25 nov (paleta del diff): master en 52c73f3.
 - Confirmado que styles.variables.light funciona; el problema anterior era de contraste, no del componente. El CSS de styles.css que se añadió para forzar colores ya no está.
 - Pendiente de diff: parametrizar la paleta por skin (mover a diffTheme o variables CSS cuando se aborden las skins); si el panel se hace redimensionable, migrar a cabeceras propias con grid + styles.splitView.
 - Sigue pendiente: test de integración con SQLite real; imágenes/avatares en fichas; historial visual (grafo).
+Sesión 26 nov (fichas: tipo y plantilla): master en 38e8f69.
+- Búsqueda por tipo de ficha: entityKindLabels en model.ts (única fuente de verdad), indexado en search.ts. Buscar "personaje", "lugar", etc. devuelve las fichas de ese tipo.
+- createKnowledgeEntity acepta details y externalLinks (la entidad ya los tenía; el servicio ahora puede crearlos al vuelo).
+- Plantilla de campos al crear ficha: personaje → Apariencia, Psicología, Argumento; lugar → Reputación, Geografía; acontecimiento → Fecha, Participantes. Campos vacíos y editables; el usuario puede borrarlos. No son campos fijos: siguen siendo details.
+- 173 tests (169 + 2 de búsqueda por tipo + 2 de details), typecheck limpio.
+- Decisión de modelo: los campos por ficha son details libres (label + value), no campos fijos por clase. La "ficha modelo" es un punto de partida editable, no una imposición. Las imágenes irán como referencias (ruta/URL) en un fichero anexo, no en BD. Los vínculos siguen con Relation + anchor.
+- Nota: el commit incluye reformateo de Prettier en workspace-service.ts y App.tsx al guardar (Format On Save activo). Los diffs grandes de este tipo son cosméticos.
+- Pendiente de fichas: imágenes/avatares (referencias en fichero anexo); simplificar la visualización de vínculos; ficha modelo en la ayuda/tour inicial.
+- Sigue pendiente: test de integración con SQLite real; historial visual (grafo); parametrizar la paleta del diff por skin.
