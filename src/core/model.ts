@@ -36,6 +36,17 @@ export const relationKindLabels: Record<RelationKind, string> = {
   inspired_by: "Inspirado en",
 };
 
+export const entityKindLabels: Record<EntityKind, string> = {
+  character: "Personaje",
+  place: "Lugar",
+  event: "Acontecimiento",
+  story: "Historia",
+  concept: "Concepto",
+  person: "Persona",
+  organization: "Organización",
+  other: "Otro",
+};
+
 export type DocumentKind = "chapter" | "fragment" | "note";
 
 export type ProjectKind =

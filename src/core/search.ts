@@ -9,6 +9,8 @@ import type {
   FragmentAnchor,
 } from "./model.js";
 
+import { entityKindLabels } from "./model.js";
+
 export type SearchItemType = TagTargetType;
 
 export interface SearchResult {
@@ -69,6 +71,7 @@ function excerptFor(text: string, term: string): string {
 export function buildProjectSearchIndex(
   input: Omit<SearchInput, "query">,
 ): SearchIndex {
+  
   const tagsByTarget = new Map<string, string[]>();
   const passageTagsByTarget = new Map<
     string,
@@ -115,11 +118,9 @@ export function buildProjectSearchIndex(
       type: "entity" as const,
       title: item.title,
       text: [
+        entityKindLabels[item.kind],
         item.description,
-        ...(item.details ?? []).flatMap((detail) => [
-          detail.label,
-          detail.value,
-        ]),
+        ...(item.details ?? []).flatMap((detail) => [detail.label, detail.value]),
         ...(item.externalLinks ?? []).flatMap((link) => [link.label, link.url]),
       ]
         .filter(Boolean)
@@ -129,16 +130,7 @@ export function buildProjectSearchIndex(
       id: item.id,
       type: "source" as const,
       title: item.title,
-      text: [
-        item.author,
-        item.publisher,
-        item.year,
-        item.doi,
-        item.url,
-        item.citation,
-      ]
-        .filter(Boolean)
-        .join(" "),
+      text: [item.author, item.publisher, item.year, item.doi, item.url, item.citation].filter(Boolean).join(" "),
     })),
     ...input.notes.map((item) => ({
       id: item.id,

@@ -13,6 +13,7 @@ import type {
   TagAssignment,
 } from "../src/core/model.js";
 
+
 function assignment(
   tagId: string,
   targetId: string,
@@ -237,5 +238,55 @@ describe("búsqueda del proyecto", () => {
       "d1",
     ]);
     expect(searchIndexedProject(index, "otro")).toEqual([]);
+  });
+});
+
+describe("búsqueda por tipo de ficha", () => {
+  it("encuentra fichas por el nombre de su tipo", () => {
+    const projectId = "p1";
+    const entity: KnowledgeEntity = {
+      id: "e1",
+      projectId,
+      kind: "character",
+      title: "Alicia",
+      description: "Protagonista",
+    };
+    const results = searchProject({
+      query: "personaje",
+      documents: [],
+      entities: [entity],
+      sources: [],
+      notes: [],
+      tags: [],
+      assignments: [],
+    });
+    expect(results.some((r) => r.id === "e1")).toBe(true);
+  });
+
+  it("no devuelve fichas de otro tipo al buscar un tipo concreto", () => {
+    const projectId = "p1";
+    const character: KnowledgeEntity = {
+      id: "e1",
+      projectId,
+      kind: "character",
+      title: "Alicia",
+    };
+    const place: KnowledgeEntity = {
+      id: "e2",
+      projectId,
+      kind: "place",
+      title: "Wonderland",
+    };
+    const results = searchProject({
+      query: "lugar",
+      documents: [],
+      entities: [character, place],
+      sources: [],
+      notes: [],
+      tags: [],
+      assignments: [],
+    });
+    expect(results.some((r) => r.id === "e2")).toBe(true);
+    expect(results.some((r) => r.id === "e1")).toBe(false);
   });
 });

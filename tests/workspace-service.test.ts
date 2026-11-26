@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryProjectStorage } from "../src/core/memory-storage.js";
 import { WorkspaceService } from "../src/application/workspace-service.js";
-import { createTestService } from "./helpers.js";
+import { createProjectWithService, createTestService } from "./helpers.js";
 
 describe("WorkspaceService", () => {
   it("crea un proyecto y permite recuperarlo", async () => {
@@ -375,5 +375,40 @@ describe("WorkspaceService", () => {
     expect(relations.map((r) => r.id).sort()).toEqual(
       [relationOld.id, relationNew.id].sort(),
     );
+  });
+  describe("createKnowledgeEntity con details", () => {
+    it("crea una ficha con details predefinidos", async () => {
+      const { service } = createTestService();
+      const project = await createProjectWithService(service);
+
+      const entity = await service.createKnowledgeEntity({
+        projectId: project.id,
+        kind: "character",
+        title: "Alicia",
+        details: [
+          { label: "Apariencia", value: "" },
+          { label: "Psicología", value: "" },
+        ],
+      });
+
+      expect(entity.details).toHaveLength(2);
+      expect(entity.details![0]!.label).toBe("Apariencia");
+
+      const listed = await service.listKnowledgeEntities(project.id);
+      expect(listed[0]!.details).toHaveLength(2);
+    });
+
+    it("crea una ficha sin details si no se pasan", async () => {
+      const { service } = createTestService();
+      const project = await createProjectWithService(service);
+
+      const entity = await service.createKnowledgeEntity({
+        projectId: project.id,
+        kind: "other",
+        title: "Nota",
+      });
+
+      expect(entity.details).toBeUndefined();
+    });
   });
 });

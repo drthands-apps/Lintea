@@ -16,6 +16,7 @@ import type {
   Tag,
   TagAssignment,
   TagTargetType,
+  EntityDetail,
 } from "../../src/core/model.js";
 import { createId, relationKindLabels } from "../../src/core/model.js";
 import { MemoryProjectStorage } from "../../src/core/memory-storage.js";
@@ -131,6 +132,29 @@ function entityKindLabel(kind: KnowledgeEntity["kind"]): string {
     other: "Otro",
   };
   return labels[kind];
+}
+
+function entityTemplateDetails(kind: KnowledgeEntity["kind"]): EntityDetail[] {
+  switch (kind) {
+    case "character":
+      return [
+        { label: "Apariencia", value: "" },
+        { label: "Psicología", value: "" },
+        { label: "Argumento", value: "" },
+      ];
+    case "place":
+      return [
+        { label: "Reputación", value: "" },
+        { label: "Geografía", value: "" },
+      ];
+    case "event":
+      return [
+        { label: "Fecha", value: "" },
+        { label: "Participantes", value: "" },
+      ];
+    default:
+      return [];
+  }
 }
 
 async function loadProjectComposition(
@@ -827,15 +851,16 @@ export default function App() {
         projectNotes,
         projectTags,
         projectTagAssignments,
-      ] = await Promise.all([
-        workspace.listDocuments(nextProject.id),
-        workspace.listKnowledgeEntities(nextProject.id),
-        workspace.listSources(nextProject.id),
-        workspace.listRelations(nextProject.id),
-        workspace.listAuthorNotes(nextProject.id),
-        workspace.listTags(nextProject.id),
-        workspace.listTagAssignments(nextProject.id),
-      ]);
+      ]: [DocumentRecord[], KnowledgeEntity[], SourceRecord[], Relation[], AuthorNote[], Tag[], TagAssignment[]] =
+        await Promise.all([
+          workspace.listDocuments(nextProject.id),
+          workspace.listKnowledgeEntities(nextProject.id),
+          workspace.listSources(nextProject.id),
+          workspace.listRelations(nextProject.id),
+          workspace.listAuthorNotes(nextProject.id),
+          workspace.listTags(nextProject.id),
+          workspace.listTagAssignments(nextProject.id),
+        ]);
       const composition = await loadProjectComposition(workspace, projectDocuments);
       setProject(nextProject);
       setProjectId(nextProject.id);
@@ -1233,8 +1258,9 @@ export default function App() {
       const service = await getWorkspace();
       const entity = await service.createKnowledgeEntity({
         projectId,
-        kind: newEntityKind,
-        title: newEntityTitle,
+        kind: newEntityKind, // o `kind` en createEntityFromSelection
+        title: newEntityTitle, // o `title` en createEntityFromSelection
+        details: entityTemplateDetails(newEntityKind), // o `kind`
       });
       setEntities((current) => [...current, entity]);
       setNewEntityTitle("");
@@ -1360,8 +1386,9 @@ export default function App() {
       const service = await getWorkspace();
       const entity = await service.createKnowledgeEntity({
         projectId,
-        kind,
-        title,
+        kind: newEntityKind, // o `kind` en createEntityFromSelection
+        title: newEntityTitle, // o `title` en createEntityFromSelection
+        details: entityTemplateDetails(newEntityKind), // o `kind`
       });
       setEntities((current) => [...current, entity]);
       if (activeDocument && activeView === "writing") {
@@ -4691,42 +4718,41 @@ export default function App() {
               useDarkTheme={false}
               styles={{
                 variables: {
-  light: {
-    diffViewerBackground: "#fbfaf6",
-    diffViewerTitleBackground: "#f2f1eb",
-    diffViewerTitleColor: "#2f322c",
-    diffViewerTitleBorderColor: "#e3e1d8",
-    diffViewerColor: "#2f322c",
+                  light: {
+                    diffViewerBackground: "#fbfaf6",
+                    diffViewerTitleBackground: "#f2f1eb",
+                    diffViewerTitleColor: "#2f322c",
+                    diffViewerTitleBorderColor: "#e3e1d8",
+                    diffViewerColor: "#2f322c",
 
-    // Líneas eliminadas: más contraste que #f4e4e2
-    removedBackground: "#f0d6d2",
-    removedColor: "#5a2320",
-    removedGutterBackground: "#e6c2be",
-    removedGutterColor: "#5a2320",
+                    // Líneas eliminadas: más contraste que #f4e4e2
+                    removedBackground: "#f0d6d2",
+                    removedColor: "#5a2320",
+                    removedGutterBackground: "#e6c2be",
+                    removedGutterColor: "#5a2320",
 
-    // Líneas añadidas: más contraste que #e6f0e6
-    addedBackground: "#d6e8d6",
-    addedColor: "#1f4a1f",
-    addedGutterBackground: "#bcd8bc",
-    addedGutterColor: "#1f4a1f",
+                    // Líneas añadidas: más contraste que #e6f0e6
+                    addedBackground: "#d6e8d6",
+                    addedColor: "#1f4a1f",
+                    addedGutterBackground: "#bcd8bc",
+                    addedGutterColor: "#1f4a1f",
 
-    // Palabras cambiadas: un paso más intenso que la línea
-    wordAddedBackground: "#a8d4a8",
-    wordRemovedBackground: "#e8b4ae",
+                    // Palabras cambiadas: un paso más intenso que la línea
+                    wordAddedBackground: "#a8d4a8",
+                    wordRemovedBackground: "#e8b4ae",
 
-    // Gutter neutro
-    gutterBackground: "#f2f1eb",
-    gutterBackgroundDark: "#ece9df",
-    gutterColor: "#8a8c82",
+                    // Gutter neutro
+                    gutterBackground: "#f2f1eb",
+                    gutterBackgroundDark: "#ece9df",
+                    gutterColor: "#8a8c82",
 
-    // Code fold
-    codeFoldBackground: "#f2f1eb",
-    codeFoldGutterBackground: "#ece9df",
-    emptyLineBackground: "#faf9f4"
+                    // Code fold
+                    codeFoldBackground: "#f2f1eb",
+                    codeFoldGutterBackground: "#ece9df",
+                    emptyLineBackground: "#faf9f4",
 
-    // highlightBackground y highlightGutterBackground: fuera, no se usan
-  }
-
+                    // highlightBackground y highlightGutterBackground: fuera, no se usan
+                  },
                 },
                 titleBlock: {
                   padding: "8px 12px",
