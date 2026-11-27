@@ -113,3 +113,11 @@ Sesión 26 nov (fichas: tipo y plantilla): master en 38e8f69.
 - Nota: el commit incluye reformateo de Prettier en workspace-service.ts y App.tsx al guardar (Format On Save activo). Los diffs grandes de este tipo son cosméticos.
 - Pendiente de fichas: imágenes/avatares (referencias en fichero anexo); simplificar la visualización de vínculos; ficha modelo en la ayuda/tour inicial.
 - Sigue pendiente: test de integración con SQLite real; historial visual (grafo); parametrizar la paleta del diff por skin.
+Sesión 27 nov (SQLite real en tests): infraestructura de test con better-sqlite3.
+- Interfaz SqliteDatabase (execute + select) en src/adapters/sqlite-database.ts.
+- SqliteProjectStorage con constructor público y Database inyectable; applySchema extraído a función reutilizable.
+- Adaptador better-sqlite3 para tests (tests/helpers/sqlite-test-db.ts): createTestSqliteStorage y createTestSqliteStorageFromPath.
+- Dos tests de integración (tests/versions-sqlite-integration.test.ts): filtrado de ocultación (hidden = 1, no NULL) y persistencia entre cierres/aperturas de la BD.
+- 175 tests en verde, typecheck limpio.
+- Confirmado: no hay discrepancia entre MemoryProjectStorage y SQLite en el flujo de ocultación.
+- Pendiente: limpiar directorios temporales en el close() del helper (rmSync); ampliar tests de integración a migraciones, orden de filas y filtros de tags; imágenes/avatares en fichas; simplificar visualización de vínculos; historial visual (grafo); parametrizar paleta del diff por skin.

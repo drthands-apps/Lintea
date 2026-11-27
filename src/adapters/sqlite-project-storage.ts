@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
-import type {
+import type { SqliteDatabase } from "./sqlite-database.js";
+ import type {
   DocumentRecord,
   Id,
   Project,
@@ -17,240 +18,32 @@ import type { DocumentVersion, VersionRelation } from "../core/versions.js";
 type SqlRow<T> = T;
 
 export class SqliteProjectStorage implements ProjectStorage {
-  private constructor(private readonly database: Database) {}
+  public constructor(private readonly database: SqliteDatabase) {}
 
+ 
   static async create(): Promise<SqliteProjectStorage> {
     const database = await Database.load("sqlite:lintea.db");
-
-    await database.execute(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL
-      )
-    `);
-    const projectColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(projects)",
-    );
-
-    if (!projectColumns.some((column) => column.name === "context")) {
-      await database.execute("ALTER TABLE projects ADD COLUMN context TEXT");
-    }
-
-    await database.execute(`
-      CREATE TABLE IF NOT EXISTS documents (
-        id TEXT PRIMARY KEY,
-        projectId TEXT NOT NULL,
-        title TEXT NOT NULL,
-        text TEXT NOT NULL,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        kind TEXT NOT NULL DEFAULT 'note',
-        sortOrder INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (projectId) REFERENCES projects(id)
-      )
-    `);
-    const documentColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(documents)",
-    );
-    if (!documentColumns.some((column) => column.name === "kind")) {
-      await database.execute(
-        "ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT 'note'",
-      );
-    }
-    if (!documentColumns.some((column) => column.name === "sortOrder")) {
-      await database.execute(
-        "ALTER TABLE documents ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0",
-      );
-    }
-
-    await database.execute(`
-      CREATE TABLE IF NOT EXISTS document_versions (
-        id TEXT PRIMARY KEY,
-        documentId TEXT NOT NULL,
-        projectId TEXT NOT NULL,
-        title TEXT NOT NULL,
-        text TEXT NOT NULL,
-        capturedAt TEXT NOT NULL,
-        documentUpdatedAt TEXT NOT NULL,
-        label TEXT,
-        note TEXT,
-        FOREIGN KEY (documentId) REFERENCES documents(id),
-        FOREIGN KEY (projectId) REFERENCES projects(id)
-      )
-    `);
-
-    // Migración v0.2: renombrar createdAt a capturedAt en bases existentes.
-    // En bases nuevas, la columna ya se crea como capturedAt.
-
-    const versionColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(document_versions)",
-    );
-    const newVersionColumns: Array<[string, string]> = [
-      ["kind", "TEXT NOT NULL DEFAULT 'note'"],
-      ["sortOrder", "INTEGER NOT NULL DEFAULT 0"],
-      ["pinned", "INTEGER NOT NULL DEFAULT 0"],
-      ["baseStateId", "TEXT"],
-      ["baseMissing", "INTEGER NOT NULL DEFAULT 0"],
-      ["changes", "TEXT"],
-      ["contentHash", "TEXT"],
-      ["referenceHash", "TEXT"],
-      ["relationIds", "TEXT"],
-      ["tagAssignmentKeys", "TEXT"],
-      ["authorNoteIds", "TEXT"],
-      ["compositionEntryIds", "TEXT"],
-      ["hidden", "INTEGER NOT NULL DEFAULT 0"],
-      ["hiddenAt", "TEXT"],
-      ["replacedBy", "TEXT"],
-      ["replacedAt", "TEXT"],
-    ];
-    for (const [column, definition] of newVersionColumns) {
-      if (!versionColumns.some((c) => c.name === column)) {
-        await database.execute(
-          `ALTER TABLE document_versions ADD COLUMN ${column} ${definition}`,
-        );
-      }
-    }
-
-    await database.execute(`
-      CREATE TABLE IF NOT EXISTS version_relations (
-        id TEXT PRIMARY KEY,
-        documentId TEXT NOT NULL,
-        projectId TEXT NOT NULL,
-        fromStateId TEXT NOT NULL,
-        toStateId TEXT NOT NULL,
-        capturedAt TEXT NOT NULL,
-        label TEXT,
-        note TEXT,
-        rejected INTEGER NOT NULL DEFAULT 0,
-        fromMissing INTEGER NOT NULL DEFAULT 0,
-        toMissing INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (documentId) REFERENCES documents(id),
-        FOREIGN KEY (projectId) REFERENCES projects(id)
-      )
-    `);
-
-    if (
-      versionColumns.some((column) => column.name === "createdAt") &&
-      !versionColumns.some((column) => column.name === "capturedAt")
-    ) {
-      await database.execute(
-        "ALTER TABLE document_versions RENAME COLUMN createdAt TO capturedAt",
-      );
-    }
-
-    await database.execute(`CREATE TABLE IF NOT EXISTS knowledge_entities (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, kind TEXT NOT NULL,
-      title TEXT NOT NULL, description TEXT, details TEXT, externalLinks TEXT,
-      sortOrder INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (projectId) REFERENCES projects(id))`);
-    const entityColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(knowledge_entities)",
-    );
-    for (const column of ["details", "externalLinks"]) {
-      if (!entityColumns.some((item) => item.name === column))
-        await database.execute(
-          `ALTER TABLE knowledge_entities ADD COLUMN ${column} TEXT`,
-        );
-    }
-    if (!entityColumns.some((column) => column.name === "sortOrder")) {
-      await database.execute(
-        "ALTER TABLE knowledge_entities ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0",
-      );
-    }
-    await database.execute(`CREATE TABLE IF NOT EXISTS sources (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, title TEXT NOT NULL,
-      author TEXT, url TEXT, citation TEXT, publisher TEXT, year TEXT, doi TEXT,
-      sortOrder INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (projectId) REFERENCES projects(id))`);
-    const sourceColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(sources)",
-    );
-    for (const column of ["publisher", "year", "doi"]) {
-      if (!sourceColumns.some((item) => item.name === column)) {
-        await database.execute(`ALTER TABLE sources ADD COLUMN ${column} TEXT`);
-      }
-    }
-    if (!sourceColumns.some((item) => item.name === "sortOrder"))
-      await database.execute(
-        "ALTER TABLE sources ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0",
-      );
-    await database.execute(`CREATE TABLE IF NOT EXISTS relations (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, fromId TEXT NOT NULL,
-      fromType TEXT NOT NULL, toId TEXT NOT NULL, toType TEXT NOT NULL,
-      kind TEXT NOT NULL, createdAt TEXT NOT NULL, note TEXT, anchor TEXT,
-      FOREIGN KEY (projectId) REFERENCES projects(id))`);
-    const relationColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(relations)",
-    );
-    if (!relationColumns.some((column) => column.name === "anchor")) {
-      await database.execute("ALTER TABLE relations ADD COLUMN anchor TEXT");
-    }
-    await database.execute(`CREATE TABLE IF NOT EXISTS composition_entries (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, chapterId TEXT NOT NULL,
-      fragmentId TEXT NOT NULL, sortOrder INTEGER NOT NULL, createdAt TEXT NOT NULL,
-      FOREIGN KEY (projectId) REFERENCES projects(id),
-      FOREIGN KEY (chapterId) REFERENCES documents(id),
-      FOREIGN KEY (fragmentId) REFERENCES documents(id))`);
-    await database.execute(`CREATE TABLE IF NOT EXISTS author_notes (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, content TEXT NOT NULL,
-      color TEXT NOT NULL, targetType TEXT, targetId TEXT,
-      createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, sortOrder INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (projectId) REFERENCES projects(id))`);
-    const noteColumns = await database.select<{ name: string }[]>(
-      "PRAGMA table_info(author_notes)",
-    );
-    if (!noteColumns.some((item) => item.name === "sortOrder"))
-      await database.execute(
-        "ALTER TABLE author_notes ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0",
-      );
-
-    await database.execute(`CREATE TABLE IF NOT EXISTS project_tags (
-      id TEXT PRIMARY KEY, projectId TEXT NOT NULL, name TEXT NOT NULL,
-      normalizedName TEXT NOT NULL, createdAt TEXT NOT NULL,
-      UNIQUE (projectId, normalizedName),
-      FOREIGN KEY (projectId) REFERENCES projects(id))`);
-    await database.execute(`CREATE TABLE IF NOT EXISTS tag_assignments (
-      projectId TEXT NOT NULL, tagId TEXT NOT NULL, targetType TEXT NOT NULL, targetId TEXT NOT NULL,
-      PRIMARY KEY (projectId, tagId, targetType, targetId),
-      FOREIGN KEY (projectId) REFERENCES projects(id),
-      FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
-    await database.execute(
-      "CREATE INDEX IF NOT EXISTS idx_tag_assignments_target ON tag_assignments (projectId, targetType, targetId)",
-    );
-    await database.execute(`CREATE TABLE IF NOT EXISTS passage_tag_assignments (
-      projectId TEXT NOT NULL, tagId TEXT NOT NULL, targetId TEXT NOT NULL,
-      documentId TEXT NOT NULL, quote TEXT NOT NULL, prefix TEXT NOT NULL, suffix TEXT NOT NULL,
-      PRIMARY KEY (projectId, tagId, targetId, documentId, quote, prefix, suffix),
-      FOREIGN KEY (projectId) REFERENCES projects(id),
-      FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
-
+    await applySchema(database);
     return new SqliteProjectStorage(database);
   }
+  
 
   async listProjects(): Promise<Project[]> {
-    const rows = await this.database.select<
-      (Project & { context: string | null })[]
-    >(
-      "SELECT id, title, createdAt, updatedAt, context FROM projects ORDER BY createdAt",
+    const rows = await this.database.select<(Project & { context: string | null })[]>(
+      "SELECT id, title, createdAt, updatedAt, context FROM projects ORDER BY createdAt"
     );
 
     return rows.map(({ context, ...project }) => ({
       ...project,
-      context: context
-        ? (JSON.parse(context) as Project["context"])
-        : undefined,
+      context: context ? (JSON.parse(context) as Project["context"]) : undefined,
     }));
   }
 
   async getProject(projectId: Id): Promise<Project | null> {
-    const rows = await this.database.select<
-      (Project & { context: string | null })[]
-    >(
+    const rows = await this.database.select<(Project & { context: string | null })[]>(
       `SELECT id, title, createdAt, updatedAt, context
      FROM projects WHERE id = ?`,
-      [projectId],
+      [projectId]
     );
 
     const row = rows[0];
@@ -263,9 +56,7 @@ export class SqliteProjectStorage implements ProjectStorage {
 
     return {
       ...project,
-      context: context
-        ? (JSON.parse(context) as Project["context"])
-        : undefined,
+      context: context ? (JSON.parse(context) as Project["context"]) : undefined,
     };
   }
 
@@ -280,7 +71,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         project.createdAt,
         project.updatedAt,
         project.context ? JSON.stringify(project.context) : null,
-      ],
+      ]
     );
   }
 
@@ -289,12 +80,7 @@ export class SqliteProjectStorage implements ProjectStorage {
       `UPDATE projects
      SET title = ?, updatedAt = ?, context = ?
      WHERE id = ?`,
-      [
-        project.title,
-        project.updatedAt,
-        project.context ? JSON.stringify(project.context) : null,
-        project.id,
-      ],
+      [project.title, project.updatedAt, project.context ? JSON.stringify(project.context) : null, project.id]
     );
 
     if (result.rowsAffected === 0) {
@@ -306,7 +92,7 @@ export class SqliteProjectStorage implements ProjectStorage {
     return this.database.select<DocumentRecord[]>(
       `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS [order]
        FROM documents WHERE projectId = ? ORDER BY sortOrder, createdAt`,
-      [projectId],
+      [projectId]
     );
   }
 
@@ -314,7 +100,7 @@ export class SqliteProjectStorage implements ProjectStorage {
     const rows = await this.database.select<DocumentRecord[]>(
       `SELECT id, projectId, title, text, createdAt, updatedAt, kind, sortOrder AS [order]
        FROM documents WHERE id = ?`,
-      [documentId],
+      [documentId]
     );
     return rows[0] ?? null;
   }
@@ -333,7 +119,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         document.updatedAt,
         document.kind ?? "note",
         document.order ?? 0,
-      ],
+      ]
     );
   }
 
@@ -350,7 +136,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         document.kind ?? "note",
         document.order ?? 0,
         document.id,
-      ],
+      ]
     );
 
     if (result.rowsAffected === 0) {
@@ -366,16 +152,12 @@ export class SqliteProjectStorage implements ProjectStorage {
       })[]
     >(
       "SELECT id, projectId, kind, title, description, details, externalLinks, sortOrder AS [order] FROM knowledge_entities WHERE projectId = ? ORDER BY sortOrder, title",
-      [projectId],
+      [projectId]
     );
     return rows.map(({ details, externalLinks, ...entity }) => ({
       ...entity,
-      details: details
-        ? (JSON.parse(details) as KnowledgeEntity["details"])
-        : [],
-      externalLinks: externalLinks
-        ? (JSON.parse(externalLinks) as KnowledgeEntity["externalLinks"])
-        : [],
+      details: details ? (JSON.parse(details) as KnowledgeEntity["details"]) : [],
+      externalLinks: externalLinks ? (JSON.parse(externalLinks) as KnowledgeEntity["externalLinks"]) : [],
     }));
   }
 
@@ -391,7 +173,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         JSON.stringify(entity.details ?? []),
         JSON.stringify(entity.externalLinks ?? []),
         entity.order ?? 0,
-      ],
+      ]
     );
   }
 
@@ -407,35 +189,31 @@ export class SqliteProjectStorage implements ProjectStorage {
         entity.order ?? 0,
         entity.id,
         entity.projectId,
-      ],
+      ]
     );
-    if (result.rowsAffected === 0)
-      throw new Error("No se puede actualizar una ficha que no existe.");
+    if (result.rowsAffected === 0) throw new Error("No se puede actualizar una ficha que no existe.");
   }
 
   async deleteKnowledgeEntity(projectId: Id, entityId: Id): Promise<void> {
     await this.database.execute(
       "DELETE FROM tag_assignments WHERE projectId = ? AND targetType = 'entity' AND targetId = ?",
-      [projectId, entityId],
+      [projectId, entityId]
     );
     await this.database.execute(
       "DELETE FROM relations WHERE projectId = ? AND ((fromId = ? AND fromType IN ('entity', 'event')) OR (toId = ? AND toType IN ('entity', 'event')))",
-      [projectId, entityId, entityId],
+      [projectId, entityId, entityId]
     );
     await this.database.execute(
       "UPDATE author_notes SET targetType = NULL, targetId = NULL WHERE projectId = ? AND targetId = ? AND targetType IN ('entity', 'event')",
-      [projectId, entityId],
+      [projectId, entityId]
     );
-    await this.database.execute(
-      "DELETE FROM knowledge_entities WHERE projectId = ? AND id = ?",
-      [projectId, entityId],
-    );
+    await this.database.execute("DELETE FROM knowledge_entities WHERE projectId = ? AND id = ?", [projectId, entityId]);
   }
 
   listSources(projectId: Id): Promise<SourceRecord[]> {
     return this.database.select<SourceRecord[]>(
       "SELECT id, projectId, title, author, url, citation, publisher, year, doi, sortOrder AS [order] FROM sources WHERE projectId = ? ORDER BY sortOrder, title",
-      [projectId],
+      [projectId]
     );
   }
 
@@ -453,7 +231,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         source.year ?? null,
         source.doi ?? null,
         source.order ?? 0,
-      ],
+      ]
     );
   }
 
@@ -471,44 +249,38 @@ export class SqliteProjectStorage implements ProjectStorage {
         source.order ?? 0,
         source.id,
         source.projectId,
-      ],
+      ]
     );
-    if (result.rowsAffected === 0)
-      throw new Error("No se puede actualizar una fuente que no existe.");
+    if (result.rowsAffected === 0) throw new Error("No se puede actualizar una fuente que no existe.");
   }
 
   async deleteSource(projectId: Id, sourceId: Id): Promise<void> {
     await this.database.execute(
       "DELETE FROM tag_assignments WHERE projectId = ? AND targetType = 'source' AND targetId = ?",
-      [projectId, sourceId],
+      [projectId, sourceId]
     );
     await this.database.execute(
       "DELETE FROM relations WHERE projectId = ? AND ((fromType = 'source' AND fromId = ?) OR (toType = 'source' AND toId = ?))",
-      [projectId, sourceId, sourceId],
+      [projectId, sourceId, sourceId]
     );
     await this.database.execute(
       "UPDATE author_notes SET targetType = NULL, targetId = NULL WHERE projectId = ? AND targetType = 'source' AND targetId = ?",
-      [projectId, sourceId],
+      [projectId, sourceId]
     );
-    await this.database.execute(
-      "DELETE FROM sources WHERE projectId = ? AND id = ?",
-      [projectId, sourceId],
-    );
+    await this.database.execute("DELETE FROM sources WHERE projectId = ? AND id = ?", [projectId, sourceId]);
   }
 
   listRelations(projectId: Id): Promise<Relation[]> {
     return this.database
       .select<(Omit<Relation, "anchor"> & { anchor: string | null })[]>(
         "SELECT id, projectId, fromId, fromType, toId, toType, kind, createdAt, note, anchor FROM relations WHERE projectId = ? ORDER BY createdAt",
-        [projectId],
+        [projectId]
       )
       .then((rows) =>
         rows.map(({ anchor, ...relation }) => ({
           ...relation,
-          anchor: anchor
-            ? (JSON.parse(anchor) as Relation["anchor"])
-            : undefined,
-        })),
+          anchor: anchor ? (JSON.parse(anchor) as Relation["anchor"]) : undefined,
+        }))
       );
   }
 
@@ -526,7 +298,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         relation.createdAt,
         relation.note ?? null,
         relation.anchor ? JSON.stringify(relation.anchor) : null,
-      ],
+      ]
     );
   }
 
@@ -544,25 +316,19 @@ export class SqliteProjectStorage implements ProjectStorage {
         relation.anchor ? JSON.stringify(relation.anchor) : null,
         relation.projectId,
         relation.id,
-      ],
+      ]
     );
-    if (result.rowsAffected === 0)
-      throw new Error("No se puede actualizar una relación que no existe.");
+    if (result.rowsAffected === 0) throw new Error("No se puede actualizar una relación que no existe.");
   }
 
   async deleteRelation(projectId: Id, relationId: Id): Promise<void> {
-    await this.database.execute(
-      "DELETE FROM relations WHERE projectId = ? AND id = ?",
-      [projectId, relationId],
-    );
+    await this.database.execute("DELETE FROM relations WHERE projectId = ? AND id = ?", [projectId, relationId]);
   }
 
   async listCompositionEntries(chapterId: Id): Promise<CompositionEntry[]> {
-    const rows = await this.database.select<
-      (Omit<CompositionEntry, "order"> & { sortOrder: number })[]
-    >(
+    const rows = await this.database.select<(Omit<CompositionEntry, "order"> & { sortOrder: number })[]>(
       "SELECT id, projectId, chapterId, fragmentId, sortOrder, createdAt FROM composition_entries WHERE chapterId = ? ORDER BY sortOrder",
-      [chapterId],
+      [chapterId]
     );
     return rows.map(({ sortOrder, ...entry }) => ({
       ...entry,
@@ -573,50 +339,36 @@ export class SqliteProjectStorage implements ProjectStorage {
   async createCompositionEntry(entry: CompositionEntry): Promise<void> {
     await this.database.execute(
       "INSERT INTO composition_entries (id, projectId, chapterId, fragmentId, sortOrder, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        entry.id,
-        entry.projectId,
-        entry.chapterId,
-        entry.fragmentId,
-        entry.order,
-        entry.createdAt,
-      ],
+      [entry.id, entry.projectId, entry.chapterId, entry.fragmentId, entry.order, entry.createdAt]
     );
   }
 
   async deleteCompositionEntry(chapterId: Id, entryId: Id): Promise<void> {
-    await this.database.execute(
-      "DELETE FROM composition_entries WHERE chapterId = ? AND id = ?",
-      [chapterId, entryId],
-    );
+    await this.database.execute("DELETE FROM composition_entries WHERE chapterId = ? AND id = ?", [chapterId, entryId]);
   }
 
-  async reorderCompositionEntries(
-    chapterId: Id,
-    entryIds: Id[],
-  ): Promise<void> {
+  async reorderCompositionEntries(chapterId: Id, entryIds: Id[]): Promise<void> {
     const current = await this.listCompositionEntries(chapterId);
     if (
       current.length !== entryIds.length ||
       new Set(entryIds).size !== entryIds.length ||
       current.some((entry) => !entryIds.includes(entry.id))
     ) {
-      throw new Error(
-        "El nuevo orden debe incluir cada pieza del capítulo exactamente una vez.",
-      );
+      throw new Error("El nuevo orden debe incluir cada pieza del capítulo exactamente una vez.");
     }
     for (const [order, id] of entryIds.entries()) {
-      await this.database.execute(
-        "UPDATE composition_entries SET sortOrder = ? WHERE chapterId = ? AND id = ?",
-        [order, chapterId, id],
-      );
+      await this.database.execute("UPDATE composition_entries SET sortOrder = ? WHERE chapterId = ? AND id = ?", [
+        order,
+        chapterId,
+        id,
+      ]);
     }
   }
 
   listAuthorNotes(projectId: Id): Promise<AuthorNote[]> {
     return this.database.select<AuthorNote[]>(
       "SELECT id, projectId, content, color, targetType, targetId, createdAt, updatedAt, sortOrder AS [order] FROM author_notes WHERE projectId = ? ORDER BY sortOrder, updatedAt DESC",
-      [projectId],
+      [projectId]
     );
   }
 
@@ -633,7 +385,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         note.createdAt,
         note.updatedAt,
         note.order ?? 0,
-      ],
+      ]
     );
   }
 
@@ -649,27 +401,20 @@ export class SqliteProjectStorage implements ProjectStorage {
         note.order ?? 0,
         note.id,
         note.projectId,
-      ],
+      ]
     );
-    if (result.rowsAffected === 0)
-      throw new Error("No se puede actualizar una nota que no existe.");
+    if (result.rowsAffected === 0) throw new Error("No se puede actualizar una nota que no existe.");
   }
 
   async deleteAuthorNote(projectId: Id, noteId: Id): Promise<void> {
     await this.database.execute(
       "DELETE FROM tag_assignments WHERE projectId = ? AND targetType = 'author_note' AND targetId = ?",
-      [projectId, noteId],
+      [projectId, noteId]
     );
-    await this.database.execute(
-      "DELETE FROM author_notes WHERE projectId = ? AND id = ?",
-      [projectId, noteId],
-    );
+    await this.database.execute("DELETE FROM author_notes WHERE projectId = ? AND id = ?", [projectId, noteId]);
   }
 
-  async listDocumentVersions(
-    documentId: Id,
-    options: { includeHidden?: boolean } = {},
-  ): Promise<DocumentVersion[]> {
+  async listDocumentVersions(documentId: Id, options: { includeHidden?: boolean } = {}): Promise<DocumentVersion[]> {
     const whereHidden = options.includeHidden ? "" : "AND hidden = 0";
     const rows = await this.database.select<any[]>(
       `SELECT id, documentId, projectId, title, text, kind, sortOrder,
@@ -681,7 +426,7 @@ export class SqliteProjectStorage implements ProjectStorage {
        FROM document_versions
        WHERE documentId = ? ${whereHidden}
        ORDER BY capturedAt DESC`,
-      [documentId],
+      [documentId]
     );
     return rows.map((row) => ({
       id: row.id,
@@ -702,15 +447,9 @@ export class SqliteProjectStorage implements ProjectStorage {
       contentHash: row.contentHash ?? undefined,
       referenceHash: row.referenceHash ?? undefined,
       relationIds: row.relationIds ? JSON.parse(row.relationIds) : undefined,
-      tagAssignmentKeys: row.tagAssignmentKeys
-        ? JSON.parse(row.tagAssignmentKeys)
-        : undefined,
-      authorNoteIds: row.authorNoteIds
-        ? JSON.parse(row.authorNoteIds)
-        : undefined,
-      compositionEntryIds: row.compositionEntryIds
-        ? JSON.parse(row.compositionEntryIds)
-        : undefined,
+      tagAssignmentKeys: row.tagAssignmentKeys ? JSON.parse(row.tagAssignmentKeys) : undefined,
+      authorNoteIds: row.authorNoteIds ? JSON.parse(row.authorNoteIds) : undefined,
+      compositionEntryIds: row.compositionEntryIds ? JSON.parse(row.compositionEntryIds) : undefined,
       hidden: row.hidden === 1 ? true : undefined,
       hiddenAt: row.hiddenAt ?? undefined,
       replacedBy: row.replacedBy ?? undefined,
@@ -727,7 +466,7 @@ export class SqliteProjectStorage implements ProjectStorage {
             relationIds, tagAssignmentKeys, authorNoteIds, compositionEntryIds,
             hidden, hiddenAt, replacedBy, replacedAt
       FROM document_versions WHERE id = ?`,
-      [versionId],
+      [versionId]
     );
     return rows[0] ?? null;
   }
@@ -761,18 +500,14 @@ export class SqliteProjectStorage implements ProjectStorage {
         version.contentHash ?? null,
         version.referenceHash ?? null,
         version.relationIds ? JSON.stringify(version.relationIds) : null,
-        version.tagAssignmentKeys
-          ? JSON.stringify(version.tagAssignmentKeys)
-          : null,
+        version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
         version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
-        version.compositionEntryIds
-          ? JSON.stringify(version.compositionEntryIds)
-          : null,
+        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
         version.hidden ? 1 : 0,
         version.hiddenAt ?? null,
         version.replacedBy ?? null,
         version.replacedAt ?? null,
-      ],
+      ]
     );
   }
 
@@ -800,20 +535,16 @@ export class SqliteProjectStorage implements ProjectStorage {
         version.contentHash ?? null,
         version.referenceHash ?? null,
         version.relationIds ? JSON.stringify(version.relationIds) : null,
-        version.tagAssignmentKeys
-          ? JSON.stringify(version.tagAssignmentKeys)
-          : null,
+        version.tagAssignmentKeys ? JSON.stringify(version.tagAssignmentKeys) : null,
         version.authorNoteIds ? JSON.stringify(version.authorNoteIds) : null,
-        version.compositionEntryIds
-          ? JSON.stringify(version.compositionEntryIds)
-          : null,
+        version.compositionEntryIds ? JSON.stringify(version.compositionEntryIds) : null,
         version.hidden ? 1 : 0,
         version.hiddenAt ?? null,
         version.replacedBy ?? null,
         version.replacedAt ?? null,
         version.id,
         version.documentId,
-      ],
+      ]
     );
 
     if (result.rowsAffected === 0) {
@@ -822,53 +553,44 @@ export class SqliteProjectStorage implements ProjectStorage {
   }
 
   async deleteDocumentVersion(versionId: Id): Promise<void> {
-    await this.database.execute("DELETE FROM document_versions WHERE id = ?", [
-      versionId,
-    ]);
+    await this.database.execute("DELETE FROM document_versions WHERE id = ?", [versionId]);
   }
 
   listTags(projectId: Id): Promise<Tag[]> {
     return this.database.select<Tag[]>(
       "SELECT id, projectId, name, normalizedName, createdAt FROM project_tags WHERE projectId = ? ORDER BY name COLLATE NOCASE",
-      [projectId],
+      [projectId]
     );
   }
 
   async createTag(tag: Tag): Promise<void> {
     await this.database.execute(
       "INSERT INTO project_tags (id, projectId, name, normalizedName, createdAt) VALUES (?, ?, ?, ?, ?)",
-      [tag.id, tag.projectId, tag.name, tag.normalizedName, tag.createdAt],
+      [tag.id, tag.projectId, tag.name, tag.normalizedName, tag.createdAt]
     );
   }
 
   async updateTag(tag: Tag): Promise<void> {
     const result = await this.database.execute(
       "UPDATE project_tags SET name = ?, normalizedName = ? WHERE id = ? AND projectId = ?",
-      [tag.name, tag.normalizedName, tag.id, tag.projectId],
+      [tag.name, tag.normalizedName, tag.id, tag.projectId]
     );
-    if (result.rowsAffected === 0)
-      throw new Error("No se puede actualizar una etiqueta que no existe.");
+    if (result.rowsAffected === 0) throw new Error("No se puede actualizar una etiqueta que no existe.");
   }
 
   async deleteTag(projectId: Id, tagId: Id): Promise<void> {
-    await this.database.execute(
-      "DELETE FROM passage_tag_assignments WHERE projectId = ? AND tagId = ?",
-      [projectId, tagId],
-    );
-    await this.database.execute(
-      "DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ?",
-      [projectId, tagId],
-    );
-    await this.database.execute(
-      "DELETE FROM project_tags WHERE projectId = ? AND id = ?",
-      [projectId, tagId],
-    );
+    await this.database.execute("DELETE FROM passage_tag_assignments WHERE projectId = ? AND tagId = ?", [
+      projectId,
+      tagId,
+    ]);
+    await this.database.execute("DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ?", [projectId, tagId]);
+    await this.database.execute("DELETE FROM project_tags WHERE projectId = ? AND id = ?", [projectId, tagId]);
   }
 
   async listTagAssignments(projectId: Id): Promise<TagAssignment[]> {
     const documentAssignments = await this.database.select<TagAssignment[]>(
       "SELECT projectId, tagId, targetType, targetId FROM tag_assignments WHERE projectId = ?",
-      [projectId],
+      [projectId]
     );
     const passageAssignments = await this.database.select<
       Array<
@@ -881,16 +603,14 @@ export class SqliteProjectStorage implements ProjectStorage {
       >
     >(
       "SELECT projectId, tagId, 'document' AS targetType, targetId, documentId, quote, prefix, suffix FROM passage_tag_assignments WHERE projectId = ?",
-      [projectId],
+      [projectId]
     );
     return [
       ...documentAssignments,
-      ...passageAssignments.map(
-        ({ documentId, quote, prefix, suffix, ...assignment }) => ({
-          ...assignment,
-          anchor: { documentId, quote, prefix, suffix },
-        }),
-      ),
+      ...passageAssignments.map(({ documentId, quote, prefix, suffix, ...assignment }) => ({
+        ...assignment,
+        anchor: { documentId, quote, prefix, suffix },
+      })),
     ];
   }
 
@@ -906,18 +626,13 @@ export class SqliteProjectStorage implements ProjectStorage {
           assignment.anchor.quote,
           assignment.anchor.prefix,
           assignment.anchor.suffix,
-        ],
+        ]
       );
       return;
     }
     await this.database.execute(
       "INSERT OR IGNORE INTO tag_assignments (projectId, tagId, targetType, targetId) VALUES (?, ?, ?, ?)",
-      [
-        assignment.projectId,
-        assignment.tagId,
-        assignment.targetType,
-        assignment.targetId,
-      ],
+      [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]
     );
   }
 
@@ -933,18 +648,13 @@ export class SqliteProjectStorage implements ProjectStorage {
           assignment.anchor.quote,
           assignment.anchor.prefix,
           assignment.anchor.suffix,
-        ],
+        ]
       );
       return;
     }
     await this.database.execute(
       "DELETE FROM tag_assignments WHERE projectId = ? AND tagId = ? AND targetType = ? AND targetId = ?",
-      [
-        assignment.projectId,
-        assignment.tagId,
-        assignment.targetType,
-        assignment.targetId,
-      ],
+      [assignment.projectId, assignment.tagId, assignment.targetType, assignment.targetId]
     );
   }
   async listVersionRelations(documentId: Id): Promise<VersionRelation[]> {
@@ -954,7 +664,7 @@ export class SqliteProjectStorage implements ProjectStorage {
       FROM version_relations
       WHERE documentId = ?
       ORDER BY capturedAt DESC`,
-      [documentId],
+      [documentId]
     );
     return rows.map((row) => ({
       id: row.id,
@@ -989,7 +699,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         relation.rejected ? 1 : 0,
         relation.fromMissing ? 1 : 0,
         relation.toMissing ? 1 : 0,
-      ],
+      ]
     );
   }
 
@@ -1010,7 +720,7 @@ export class SqliteProjectStorage implements ProjectStorage {
         relation.toMissing ? 1 : 0,
         relation.id,
         relation.documentId,
-      ],
+      ]
     );
     if (result.rowsAffected === 0) {
       throw new Error("No se puede actualizar una relación que no existe.");
@@ -1018,9 +728,184 @@ export class SqliteProjectStorage implements ProjectStorage {
   }
 
   async deleteVersionRelation(documentId: Id, relationId: Id): Promise<void> {
-    await this.database.execute(
-      "DELETE FROM version_relations WHERE documentId = ? AND id = ?",
-      [documentId, relationId],
-    );
+    await this.database.execute("DELETE FROM version_relations WHERE documentId = ? AND id = ?", [
+      documentId,
+      relationId,
+    ]);
   }
+}
+export async function applySchema(database: SqliteDatabase): Promise<void> {
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `);
+  const projectColumns = await database.select<{ name: string }[]>("PRAGMA table_info(projects)");
+  if (!projectColumns.some((column) => column.name === "context")) {
+    await database.execute("ALTER TABLE projects ADD COLUMN context TEXT");
+  }
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      projectId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      text TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'note',
+      sortOrder INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (projectId) REFERENCES projects(id)
+    )
+  `);
+  const documentColumns = await database.select<{ name: string }[]>("PRAGMA table_info(documents)");
+  if (!documentColumns.some((column) => column.name === "kind")) {
+    await database.execute("ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT 'note'");
+  }
+  if (!documentColumns.some((column) => column.name === "sortOrder")) {
+    await database.execute("ALTER TABLE documents ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0");
+  }
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS document_versions (
+      id TEXT PRIMARY KEY,
+      documentId TEXT NOT NULL,
+      projectId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      text TEXT NOT NULL,
+      capturedAt TEXT NOT NULL,
+      documentUpdatedAt TEXT NOT NULL,
+      label TEXT,
+      note TEXT,
+      FOREIGN KEY (documentId) REFERENCES documents(id),
+      FOREIGN KEY (projectId) REFERENCES projects(id)
+    )
+  `);
+
+  const versionColumns = await database.select<{ name: string }[]>("PRAGMA table_info(document_versions)");
+  const newVersionColumns: Array<[string, string]> = [
+    ["kind", "TEXT NOT NULL DEFAULT 'note'"],
+    ["sortOrder", "INTEGER NOT NULL DEFAULT 0"],
+    ["pinned", "INTEGER NOT NULL DEFAULT 0"],
+    ["baseStateId", "TEXT"],
+    ["baseMissing", "INTEGER NOT NULL DEFAULT 0"],
+    ["changes", "TEXT"],
+    ["contentHash", "TEXT"],
+    ["referenceHash", "TEXT"],
+    ["relationIds", "TEXT"],
+    ["tagAssignmentKeys", "TEXT"],
+    ["authorNoteIds", "TEXT"],
+    ["compositionEntryIds", "TEXT"],
+    ["hidden", "INTEGER NOT NULL DEFAULT 0"],
+    ["hiddenAt", "TEXT"],
+    ["replacedBy", "TEXT"],
+    ["replacedAt", "TEXT"],
+  ];
+  for (const [column, definition] of newVersionColumns) {
+    if (!versionColumns.some((c) => c.name === column)) {
+      await database.execute(`ALTER TABLE document_versions ADD COLUMN ${column} ${definition}`);
+    }
+  }
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS version_relations (
+      id TEXT PRIMARY KEY,
+      documentId TEXT NOT NULL,
+      projectId TEXT NOT NULL,
+      fromStateId TEXT NOT NULL,
+      toStateId TEXT NOT NULL,
+      capturedAt TEXT NOT NULL,
+      label TEXT,
+      note TEXT,
+      rejected INTEGER NOT NULL DEFAULT 0,
+      fromMissing INTEGER NOT NULL DEFAULT 0,
+      toMissing INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (documentId) REFERENCES documents(id),
+      FOREIGN KEY (projectId) REFERENCES projects(id)
+    )
+  `);
+
+  if (
+    versionColumns.some((column) => column.name === "createdAt") &&
+    !versionColumns.some((column) => column.name === "capturedAt")
+  ) {
+    await database.execute("ALTER TABLE document_versions RENAME COLUMN createdAt TO capturedAt");
+  }
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS knowledge_entities (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, kind TEXT NOT NULL,
+    title TEXT NOT NULL, description TEXT, details TEXT, externalLinks TEXT,
+    sortOrder INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (projectId) REFERENCES projects(id))`);
+  const entityColumns = await database.select<{ name: string }[]>("PRAGMA table_info(knowledge_entities)");
+  for (const column of ["details", "externalLinks"]) {
+    if (!entityColumns.some((item) => item.name === column))
+      await database.execute(`ALTER TABLE knowledge_entities ADD COLUMN ${column} TEXT`);
+  }
+  if (!entityColumns.some((column) => column.name === "sortOrder")) {
+    await database.execute("ALTER TABLE knowledge_entities ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0");
+  }
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS sources (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, title TEXT NOT NULL,
+    author TEXT, url TEXT, citation TEXT, publisher TEXT, year TEXT, doi TEXT,
+    sortOrder INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (projectId) REFERENCES projects(id))`);
+  const sourceColumns = await database.select<{ name: string }[]>("PRAGMA table_info(sources)");
+  for (const column of ["publisher", "year", "doi"]) {
+    if (!sourceColumns.some((item) => item.name === column)) {
+      await database.execute(`ALTER TABLE sources ADD COLUMN ${column} TEXT`);
+    }
+  }
+  if (!sourceColumns.some((item) => item.name === "sortOrder"))
+    await database.execute("ALTER TABLE sources ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0");
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS relations (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, fromId TEXT NOT NULL,
+    fromType TEXT NOT NULL, toId TEXT NOT NULL, toType TEXT NOT NULL,
+    kind TEXT NOT NULL, createdAt TEXT NOT NULL, note TEXT, anchor TEXT,
+    FOREIGN KEY (projectId) REFERENCES projects(id))`);
+  const relationColumns = await database.select<{ name: string }[]>("PRAGMA table_info(relations)");
+  if (!relationColumns.some((column) => column.name === "anchor")) {
+    await database.execute("ALTER TABLE relations ADD COLUMN anchor TEXT");
+  }
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS composition_entries (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, chapterId TEXT NOT NULL,
+    fragmentId TEXT NOT NULL, sortOrder INTEGER NOT NULL, createdAt TEXT NOT NULL,
+    FOREIGN KEY (projectId) REFERENCES projects(id),
+    FOREIGN KEY (chapterId) REFERENCES documents(id),
+    FOREIGN KEY (fragmentId) REFERENCES documents(id))`);
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS author_notes (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, content TEXT NOT NULL,
+    color TEXT NOT NULL, targetType TEXT, targetId TEXT,
+    createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, sortOrder INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (projectId) REFERENCES projects(id))`);
+  const noteColumns = await database.select<{ name: string }[]>("PRAGMA table_info(author_notes)");
+  if (!noteColumns.some((item) => item.name === "sortOrder"))
+    await database.execute("ALTER TABLE author_notes ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0");
+
+  await database.execute(`CREATE TABLE IF NOT EXISTS project_tags (
+    id TEXT PRIMARY KEY, projectId TEXT NOT NULL, name TEXT NOT NULL,
+    normalizedName TEXT NOT NULL, createdAt TEXT NOT NULL,
+    UNIQUE (projectId, normalizedName),
+    FOREIGN KEY (projectId) REFERENCES projects(id))`);
+  await database.execute(`CREATE TABLE IF NOT EXISTS tag_assignments (
+    projectId TEXT NOT NULL, tagId TEXT NOT NULL, targetType TEXT NOT NULL, targetId TEXT NOT NULL,
+    PRIMARY KEY (projectId, tagId, targetType, targetId),
+    FOREIGN KEY (projectId) REFERENCES projects(id),
+    FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
+  await database.execute(
+    "CREATE INDEX IF NOT EXISTS idx_tag_assignments_target ON tag_assignments (projectId, targetType, targetId)"
+  );
+  await database.execute(`CREATE TABLE IF NOT EXISTS passage_tag_assignments (
+    projectId TEXT NOT NULL, tagId TEXT NOT NULL, targetId TEXT NOT NULL,
+    documentId TEXT NOT NULL, quote TEXT NOT NULL, prefix TEXT NOT NULL, suffix TEXT NOT NULL,
+    PRIMARY KEY (projectId, tagId, targetId, documentId, quote, prefix, suffix),
+    FOREIGN KEY (projectId) REFERENCES projects(id),
+    FOREIGN KEY (tagId) REFERENCES project_tags(id))`);
 }
