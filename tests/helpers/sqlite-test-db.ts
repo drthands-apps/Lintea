@@ -1,5 +1,5 @@
 import BetterSqlite3 from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SqliteProjectStorage, applySchema } from "../../src/adapters/sqlite-project-storage.js";
@@ -25,6 +25,7 @@ class BetterSqliteAdapter implements SqliteDatabase {
 export interface TestSqliteStorage {
   storage: SqliteProjectStorage;
   dbPath: string;
+  database: SqliteDatabase;
   close: () => void;
 }
 
@@ -40,9 +41,13 @@ export async function createTestSqliteStorage(): Promise<TestSqliteStorage> {
     storage,
     dbPath,
     database: adapter,
-    close: () => adapter.close(),
+    close: () => {
+      adapter.close();
+      rmSync(dir, { recursive: true, force: true });
+    },
   };
 }
+
 export async function createTestSqliteStorageFromPath(dbPath: string): Promise<TestSqliteStorage> {
   const raw = new BetterSqlite3(dbPath);
   raw.pragma("journal_mode = WAL");
@@ -55,10 +60,4 @@ export async function createTestSqliteStorageFromPath(dbPath: string): Promise<T
     database: adapter,
     close: () => adapter.close(),
   };
-}
-export interface TestSqliteStorage {
-  storage: SqliteProjectStorage;
-  dbPath: string;
-  database: SqliteDatabase;
-  close: () => void;
 }
