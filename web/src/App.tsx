@@ -2010,7 +2010,7 @@ export default function App() {
       <div className="app-shell">
         <aside className="sidebar">
           <div className="brand">
-            <div className="brand-mark">L</div>
+            <img className="brand-logo" src="/icono.png" alt="Lintea" />
             <div>
               <strong>lintea</strong>
               <span>Tu espacio de trabajo</span>
@@ -3277,6 +3277,8 @@ export default function App() {
                 <nav className="help-toc" aria-label="Contenido de la ayuda">
                   <a href="#help-writing">Escribir y dar formato</a>
                   <a href="#help-organize">Organizar el proyecto</a>
+                  <a href="#help-entities">Fichas: campos y plantillas</a>
+                  <a href="#help-entity-images">Imágenes en fichas</a>
                   <a href="#help-search">Buscar y volver a un pasaje</a>
                   <a href="#help-recovery">Guardar y recuperar</a>
                   <a href="#help-shortcuts">Atajos de teclado</a>
@@ -3304,6 +3306,49 @@ export default function App() {
                     <p>
                       Las etiquetas clasifican temas. Las relaciones expresan cómo se conectan los elementos. Selecciona
                       un pasaje antes de crear un vínculo si quieres poder regresar a ese lugar.
+                    </p>
+                    <p>
+                      La búsqueda reconoce el tipo de cada ficha: buscar «personaje», «lugar» o «acontecimiento»
+                      devuelve las fichas de ese tipo, además de las que contienen esos términos en su texto.
+                    </p>
+                  </section>
+                  <section id="help-entities">
+                    <h2>Fichas: campos y plantillas</h2>
+                    <p>
+                      Cada ficha tiene un nombre, un tipo y una descripción principal. Además, puedes añadir
+                      <strong> detalles</strong>: pares de etiqueta y valor con el nombre y el contenido que tú elijas.
+                      No hay campos obligatorios ni una estructura cerrada: una ficha puede ser una sola nota o una
+                      ficha extensa con apariencia, psicología, motivaciones y lo que necesites.
+                    </p>
+                    <p>
+                      Al crear una ficha, Lintea sugiere algunos detalles según su tipo (por ejemplo, «Apariencia»,
+                      «Psicología» y «Argumento» para un personaje; «Reputación» y «Geografía» para un lugar). Son un
+                      punto de partida editable: puedes renombrarlos, vaciarlos o eliminarlos, y añadir los que quieras.
+                      La intención es que la ficha se adapte a tu obra, no al contrario.
+                    </p>
+                    <p>
+                      Los detalles se incluyen en la búsqueda del proyecto, así que puedes encontrar una ficha por el
+                      texto de cualquiera de sus campos, no solo por su nombre.
+                    </p>
+                  </section>
+                  <section id="help-entity-images">
+                    <h2>Imágenes en fichas</h2>
+                    <p>
+                      Las fichas pueden mostrar imágenes de referencia: un retrato, un paisaje, un mapa o cualquier
+                      material visual que te ayude a recordar cómo es un personaje o un lugar. Lintea guarda la
+                      <strong> referencia</strong> a la imagen (una dirección web o una ruta a un archivo), no una copia
+                      dentro del proyecto.
+                    </p>
+                    <p>
+                      Esto tiene una consecuencia práctica: si la imagen está en una web que cambia o desaparece, o si
+                      la ruta del archivo deja de ser válida, la ficha seguirá existiendo, pero la imagen podría no
+                      cargarse. Lintea te avisará sin impedirte seguir trabajando. Si necesitas conservar una imagen
+                      para siempre, guárdala en tu equipo o en un servicio estable y usa esa referencia.
+                    </p>
+                    <p>
+                      La imagen principal (el avatar) aparece en el resumen de la ficha y en el catálogo. Las imágenes
+                      adicionales se muestran al desplegar la ficha. No se incluyen en la búsqueda del proyecto: se
+                      busca por el nombre, el tipo y el texto de los campos.
                     </p>
                   </section>
                   <section id="help-search">

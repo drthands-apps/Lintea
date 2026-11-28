@@ -2478,3 +2478,9 @@ details.context-section:not(.project-context)[open] > summary::after {
   font-size: 12px;
   line-height: 1.6;
 }
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 8px;
+}
