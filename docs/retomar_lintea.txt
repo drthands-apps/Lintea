@@ -1,123 +1,64 @@
 LINTEA — Informe para retomar el proyecto
 
-Fecha de la última sesión: 11 de noviembre de 2026.
-Último commit: (pendiente de hacer en esta sesión).
+Fecha de la última sesión: 28 de noviembre de 2026.
+Último commit: c68181d.
 Repositorio: https://github.com/drthands-apps/Lintea, rama master.
 
-ESTADO ACTUAL
-
-- 138 tests en verde. npm run typecheck limpio.
-- La aplicación de escritorio (npx tauri dev) arranca y funciona.
-- Historial por deltas operativo en SQLite: guardar, restaurar, editar etiquetas y eliminar versiones.
-- Pruebas realizadas hoy: Bloque A (guardar y recuperar), Bloque B (persistencia tras cerrar y abrir), Bloque C (rama alternativa y vuelta a estados anteriores) y Bloque D (borrado seguro). Todo funciona.
-- El borrado de versiones marca las relaciones que la tocan como interrumpidas, y la UI permite eliminar versiones sin dependencias activas.
-
-LO QUE SE HA IMPLEMENTADO HOY
-
-1. SqliteProjectStorage.deleteDocumentVersion (antes era un stub, ahora borra de verdad).
-2. WorkspaceService.deleteDocumentVersion marca las relaciones como interrumpidas (fromMissing / toMissing) antes de borrar la versión.
-3. WorkspaceService.rejectVersionRelations permite marcar relaciones como rechazadas para desbloquear borrados.
-4. WorkspaceService.updateDocumentVersionLabel permite editar la etiqueta de una versión sin tocar fecha ni contenido.
-5. UI del historial:
-   - Botón de editar etiqueta (lápiz) en cada versión.
-   - Botón de eliminar (con confirmación inline y modal de error si hay dependencias).
-   - Modal de restauración con título editable para la nueva salvaguarda previa.
-6. canDeleteVersion ahora usa los extremos de la relación (labels actuales de las versiones) si la relación no tiene label, y limita a 5 las relaciones nombradas en el mensaje ("y N más").
-
-PENDIENTE INMEDIATO (para la próxima sesión)
-
-- Comprobar el flujo completo del borrado seguro con versiones que tienen ramas (A → B → C, borrar B).
-- Probar el Bloque E (coherencia tras borrar: cerrar y abrir la app, verificar que las versiones borradas no reaparecen y que las relaciones interrumpidas se muestran correctamente).
-- Refinar la UI del historial:
-  - Acordeón: solo una versión desplegada a la vez.
-  - Indicador de "dónde estoy" (etiqueta en la versión actual o grafo de líneas ferroviarias).
-  - Diferencias entre versiones (diff contra la anterior).
-  - Previsualización del texto sin restaurar (solo lectura).
-- Diálogo de restauración: añadir el campo de título editable ya está hecho; falta pulir el texto para que explique el flujo completo (qué se va a guardar, si ya existe un punto idéntico, etc.).
-
-PENDIENTE POSTERIOR (documento de pendientes)
-
-- Menú contextual de clic derecho para crear ficha y enlazarla al pasaje.
-- Fichas con imágenes (avatares, inspiración).
-- Tablero de conexiones (grafo visual de fragmentos e hilos argumentales).
-- Editor semántico WYSIWYG (fase 5).
-- Centralizar rutas (paths.ts) para preparar instalador vs portable.
-- Export/import LinteaZip (fase 4).
-- Restaurar la selección de skin de texto y de interfaz en la UI (se perdió al reescribir App.tsx).
-- Crear la sección de "Estructura" (guía literaria, hilos argumentales) y el editor de imágenes de fichas.
+ESTADO ACTUAL (28 nov)
+- 177 tests en verde. npm run typecheck limpio.
+- La app de escritorio (npx tauri dev) arranca y funciona.
+- Historial por deltas en SQLite con modelo de ocultación (sin reconexión; reversible con unhide).
+- UI del historial: acordeón, indicador "● Actual", diff contra el estado actual en panel flotante, diálogo de restauración aclarado.
+- Fichas: búsqueda por tipo, plantilla de campos por tipo, menú contextual (clic derecho) para crear/enlazar ficha al pasaje.
+- Infraestructura de test con SQLite real (better-sqlite3); 2 tests de integración + 2 de idempotencia de applySchema.
+- Logo de Lintea en la cabecera (web/public/icono.png).
 
 CONVENCIONES DE TRABAJO
-
 - Tests primero, implementación después.
 - Commits pequeños y frecuentes, con mensaje claro.
 - npm run typecheck && npm test antes de cada commit.
 - PowerShell en Windows. Usar git --no-pager o $env:GIT_PAGER="cat" si el paginador molesta.
 - npx tauri dev para la app real; npm run dev para la web con almacenamiento en memoria.
+- Format On Save con Prettier activo: los diffs grandes al guardar son cosméticos.
 
 NOTA PERSONAL
-
 El usuario prefiere un ritmo pausado, con explicaciones claras y sin dar por hecho que el código está pegado o guardado. Ante cualquier duda de estado, pedir la salida de git status, npm test o npm run typecheck.
-Decisiones cerradas (13 nov):
 
-Inmutabilidad: versiones inmutables (modelo Git). El re-base crea nueva versión y marca la antigua con replacedBy/replacedAt. No se reescribe el contenido de una versión existente.
+DECISIONES CERRADAS (13 nov)
+[Inmutabilidad, ubicaciones, formato, edición externa, apagón. Sin cambios.]
 
-Ubicaciones: appdata/roaming/org.lintea.desktop/ (temporales, autorecuperación, config, caché, logs, backups, estado de sesión); Documentos/Lintea/<proyecto>/ (.md consolidados + .lintea/lintea.db + exportaciones). Portable por copia de carpeta.
+DECISIONES CERRADAS (14–28 nov)
+- Ocultación: cualquier versión es ocultable; deleteDocumentVersion solo marca hidden/hiddenAt; sin reconexión; reversible con unhide.
+- canDeleteVersion: allowed=true para versiones existentes; blockingRelations como info. Versión inexistente: false.
+- Fichas: details libres (label+value), no campos fijos por clase. Plantilla sugerida por tipo (editable). Búsqueda indexa tipo, details y externalLinks.
+- Imágenes en fichas: referencias (URL/ruta), no copias en BD ni en el proyecto. (Pendiente de implementar; la ayuda ya lo describe.)
+- Diff: panel flotante no bloqueante, arrastrable; paleta propia con más contraste; compara la salvaguarda con el estado en pantalla.
+- Ayuda: hoy inline en App.tsx; crecerá a página propia (Help.tsx) con temas individuales, formación progresiva y enlaces profundos. Los procesos con decisiones (exportación, IA, corrección) tendrán sección propia explicando qué se envía, a quién, qué se guarda y qué control tiene el autor.
+- Tests con SQLite real: interfaz SqliteDatabase + better-sqlite3 en tests; applySchema reutilizable e idempotente.
 
-Formato: Markdown + frontmatter YAML para almacenar; HTML + CSS para presentar (renderizado). El CSS es capa de presentación, no de almacenamiento.
+PENDIENTE INMEDIATO (próxima sesión)
+- Implementar imágenes/avatares en fichas: avatarUrl + gallery como referencias; columnas en SQLite; UI (inputs, previsualización, avatar en el resumen); tests (fake + SQLite real + schema).
 
-Edición externa: apertura por defecto; detección por hash; diálogo explícito con diff ("recargar / mantener / ver diferencias"); modo bloqueado opcional por proyecto (.lintea/lock, verificación de integridad); backups automáticos; sanitización al renderizar. Principio: el trabajo pertenece al autor; Lintea avisa, el autor decide; responsabilidad dividida.
+PENDIENTE POSTERIOR
+- Simplificar la visualización de vínculos.
+- Historial visual (grafo de líneas).
+- Parametrizar la paleta del diff por skin (diffTheme o variables CSS).
+- Ampliar la ayuda a Help.tsx cuando la app crezca.
+- Menú contextual ya hecho; plantilla de fichas ya hecha.
+- Tablero de conexiones (grafo visual de fragmentos e hilos argumentales).
+- Editor semántico WYSIWYG (fase 5).
+- Centralizar rutas (paths.ts) para instalador vs portable.
+- Export/import LinteaZip (fase 4).
+- Restaurar la selección de skin de texto y de interfaz en la UI (se perdió al reescribir App.tsx).
+- Sección de "Estructura" (guía literaria, hilos argumentales).
 
-Apagón: autosave del temporal (cada N s / N cambios) + estado de sesión (sesion.json: proyecto, documento activo, vista, paneles) + autorecuperación al arrancar (detectar huérfanos, ofrecer restaurar sesión y cambios no consolidados).
-
-Plan inmediato (mañana): formalizar estas decisiones (15 min) y arrancar 2b (reconexión de deltas, pinned visible, borrado de relaciones rotas, con inmutabilidad: re-base crea nueva versión + replacedBy en la antigua; tests reescritos).
-Sesión 14 nov (2b): cerrada. master en 6ec72e8. Modelo de ocultación implementado y validado. Bug de placeholders en updateDocumentVersion cazado y corregido. Pendiente: limpieza de logs de diagnóstico, actualización del informe, 2c (reconexión de relaciones no estructurales, des-ocultar con replacedBy, limpieza de BD), mejoras defensivas (singleton async, tests con SQLite real, placeholders nombrados).
-Sesión 22 nov (ocultación sin reconexión): cerrada en working tree, pendiente de commit.
-- deleteDocumentVersion solo marca hidden/hiddenAt; sin reconexión (rebaseOrphanChild/replacedBy fuera del flujo).
-- canDeleteVersion: allowed=true para versiones existentes; blockingRelations como info para la UI. Versión inexistente sigue en false.
-- Tests reescritos: versions-hide-reconnect (13) y versions-deletion-service (13). Suite: 169 en verde, typecheck limpio.
-- Pendiente inmediato: commit del cambio (feat(versions): ocultar sin reconexión…) + commit docs. El árbol tiene los cambios sin stagear; no cerrar el editor sin guardar.
-- Pendiente posterior: test de integración con SQLite real. SqliteProjectStorage depende de @tauri-apps/plugin-sql (Database.load), no instanciable en Vitest sin Tauri. Opciones: (A) extraer el adapter a una capa con Database inyectable + better-sqlite3 en tests; (B) script manual dentro de Tauri; (C) dejar como comprobación manual. Recomendación: A en sesión aparte, con commit propio.
-- Comprobación manual pendiente (Bloque E): en la app real, crear A→B→C→D, ocultar C, cerrar y abrir, verificar que C no aparece, D sí, y que las reconstrucciones funcionan.
-Sesión 23 nov (UI del historial y diff): master en 1fec966.
-- Acordeón: solo una versión desplegada a la vez (expandedVersionId).
-- Indicador "● Actual": la versión que coincide con el estado en pantalla (currentVersionId, vía currentStateMatchesVersion).
-- Diálogo de restauración aclarado: nombra la salvaguarda previa, avisa si coincide con la actual, pide verificar que el trabajo está salvaguardado.
-- Diff contra el estado actual en modal (react-diff-viewer-continued, fork mantenido con soporte React 19; licencia MIT). Cabecera fija con botón Cerrar; Escape cierra el modal.
-- Pendiente de salvaguardas: ventana de diff no bloqueante (panel flotante sin overlay, para copiar varios tramos al editor sin cerrar) o, alternativamente, modal arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas entre sí; historial visual (grafo de líneas).
-- Pendiente de fichas: el modelo (KnowledgeEntity) y el catálogo ya cubren personajes, lugares, acontecimientos, conceptos y otros; falta profundizar: menú contextual (clic derecho) para crear ficha y enlazarla al pasaje; imágenes/avatares (requiere migración de modelo + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
-- Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
-Sesión 24 nov (menú contextual de fichas): master en 6771fa3.
-- Clic derecho en el editor con texto seleccionado abre un menú contextual:
-  - Crear ficha (personaje, lugar, acontecimiento, concepto, otro) y enlazarla al pasaje con anchor.
-  - Enlazar ficha existente al pasaje.
-  - Enlazar fuente existente al pasaje (si hay fuentes).
-- Tras crear una ficha, se abre el catálogo con la ficha seleccionada para completarla.
-- Cierre del menú con clic fuera y Escape; sin selección, menú nativo del navegador.
-- Sin migración de modelo: usa KnowledgeEntity y Relation con anchor existentes.
-- Pendiente de fichas: imágenes/avatares (requiere migración + almacenamiento); plantillas sugeridas por tipo; sección de Estructura/hilos argumentales.
-- Pendiente de salvaguardas: ventana de diff no bloqueante/arrastrable; estilos del diff con la paleta de Lintea; comparar dos salvaguardas; historial visual.
-- Deuda técnica: test de integración con SQLite real (extraer adapter con Database inyectable + better-sqlite3).
-Sesión 25 nov (paleta del diff): master en 52c73f3.
-- Paleta del diff con más contraste e integrada con la interfaz (fondos #f0d6d2 / #d6e8d6, palabras #e8b4ae / #a8d4a8, gutter #e6c2be / #bcd8bc).
-- Eliminado el bloque dark de styles.variables (innecesario con useDarkTheme={false}).
-- Eliminadas highlightBackground y highlightGutterBackground (no se usan en el flujo actual).
-- Confirmado que styles.variables.light funciona; el problema anterior era de contraste, no del componente. El CSS de styles.css que se añadió para forzar colores ya no está.
-- Pendiente de diff: parametrizar la paleta por skin (mover a diffTheme o variables CSS cuando se aborden las skins); si el panel se hace redimensionable, migrar a cabeceras propias con grid + styles.splitView.
-- Sigue pendiente: test de integración con SQLite real; imágenes/avatares en fichas; historial visual (grafo).
-Sesión 26 nov (fichas: tipo y plantilla): master en 38e8f69.
-- Búsqueda por tipo de ficha: entityKindLabels en model.ts (única fuente de verdad), indexado en search.ts. Buscar "personaje", "lugar", etc. devuelve las fichas de ese tipo.
-- createKnowledgeEntity acepta details y externalLinks (la entidad ya los tenía; el servicio ahora puede crearlos al vuelo).
-- Plantilla de campos al crear ficha: personaje → Apariencia, Psicología, Argumento; lugar → Reputación, Geografía; acontecimiento → Fecha, Participantes. Campos vacíos y editables; el usuario puede borrarlos. No son campos fijos: siguen siendo details.
-- 173 tests (169 + 2 de búsqueda por tipo + 2 de details), typecheck limpio.
-- Decisión de modelo: los campos por ficha son details libres (label + value), no campos fijos por clase. La "ficha modelo" es un punto de partida editable, no una imposición. Las imágenes irán como referencias (ruta/URL) en un fichero anexo, no en BD. Los vínculos siguen con Relation + anchor.
-- Nota: el commit incluye reformateo de Prettier en workspace-service.ts y App.tsx al guardar (Format On Save activo). Los diffs grandes de este tipo son cosméticos.
-- Pendiente de fichas: imágenes/avatares (referencias en fichero anexo); simplificar la visualización de vínculos; ficha modelo en la ayuda/tour inicial.
-- Sigue pendiente: test de integración con SQLite real; historial visual (grafo); parametrizar la paleta del diff por skin.
-Sesión 27 nov (SQLite real en tests): infraestructura de test con better-sqlite3.
-- Interfaz SqliteDatabase (execute + select) en src/adapters/sqlite-database.ts.
-- SqliteProjectStorage con constructor público y Database inyectable; applySchema extraído a función reutilizable.
-- Adaptador better-sqlite3 para tests (tests/helpers/sqlite-test-db.ts): createTestSqliteStorage y createTestSqliteStorageFromPath.
-- Dos tests de integración (tests/versions-sqlite-integration.test.ts): filtrado de ocultación (hidden = 1, no NULL) y persistencia entre cierres/aperturas de la BD.
-- 175 tests en verde, typecheck limpio.
-- Confirmado: no hay discrepancia entre MemoryProjectStorage y SQLite en el flujo de ocultación.
-- Pendiente: limpiar directorios temporales en el close() del helper (rmSync); ampliar tests de integración a migraciones, orden de filas y filtros de tags; imágenes/avatares en fichas; simplificar visualización de vínculos; historial visual (grafo); parametrizar paleta del diff por skin.
+CRÓNICA POR SESIÓN (resumida)
+- 11 nov: borrado seguro, edición de etiquetas, UI del historial.
+- 14 nov (2b): ocultación validada. master 6ec72e8.
+- 22 nov: ocultación sin reconexión; canDeleteVersion informativo; 169 tests.
+- 23 nov: UI del historial (acordeón, indicador Actual, diálogo aclarado, diff en modal). master 1fec966.
+- 24 nov: menú contextual de fichas. master 6771fa3.
+- 25 nov: paleta del diff con más contraste. master 52c73f3.
+- 26 nov: fichas (búsqueda por tipo, plantilla de campos). master 38e8f69.
+- 27 nov: SQLite real en tests (better-sqlite3, applySchema). master ee6f93e.
+- 28 nov: limpieza de temporales, idempotencia de applySchema, logo, ayuda ampliada. master c68181d.
