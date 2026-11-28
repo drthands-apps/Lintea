@@ -61,3 +61,20 @@ export async function createTestSqliteStorageFromPath(dbPath: string): Promise<T
     close: () => adapter.close(),
   };
 }
+export async function createBareSqliteStorage(): Promise<TestSqliteStorage> {
+  const dir = mkdtempSync(join(tmpdir(), "lintea-test-"));
+  const dbPath = join(dir, "lintea.db");
+  const raw = new BetterSqlite3(dbPath);
+  raw.pragma("journal_mode = WAL");
+  const adapter = new BetterSqliteAdapter(raw);
+  const storage = new SqliteProjectStorage(adapter);
+  return {
+    storage,
+    dbPath,
+    database: adapter,
+    close: () => {
+      adapter.close();
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
